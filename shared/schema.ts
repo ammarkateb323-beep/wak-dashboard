@@ -1,0 +1,27 @@
+import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  customer_phone: text("customer_phone").notNull(),
+  direction: text("direction").notNull(), // 'inbound' | 'outbound'
+  message_text: text("message_text").notNull(),
+  created_at: timestamp("created_at").defaultNow(),
+  sender: text("sender").notNull(), // 'customer' | 'ai' | 'agent'
+});
+
+export const escalations = pgTable("escalations", {
+  customer_phone: text("customer_phone").primaryKey(),
+  escalation_reason: text("escalation_reason").notNull(),
+  status: text("status").notNull().default('open'), // 'open' | 'closed'
+  created_at: timestamp("created_at").defaultNow(),
+});
+
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, created_at: true });
+export const insertEscalationSchema = createInsertSchema(escalations).omit({ created_at: true });
+
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Escalation = typeof escalations.$inferSelect;
+export type InsertEscalation = z.infer<typeof insertEscalationSchema>;
