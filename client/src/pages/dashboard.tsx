@@ -78,7 +78,7 @@ export default function Dashboard() {
             data-testid="img-logo"
             src="/logo.png"
             alt="WAK Solutions"
-            className="h-[36px] w-auto object-contain shrink-0"
+            className="h-[36px] shrink-0"
           />
           <div className="hidden sm:block">
             <span className="font-semibold text-sm text-white/90">WAK Solutions</span>
