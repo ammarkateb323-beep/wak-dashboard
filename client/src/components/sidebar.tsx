@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { MessageSquare, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Escalation } from "@shared/schema";
+
+type Filter = 'all' | 'open' | 'closed';
 
 interface SidebarProps {
   escalations: Escalation[];
@@ -10,8 +13,18 @@ interface SidebarProps {
 }
 
 export function Sidebar({ escalations, selectedPhone, onSelect }: SidebarProps) {
+  const [filter, setFilter] = useState<Filter>('all');
+
   const openEscalations = escalations.filter(e => e.status === 'open');
-  const closedEscalations = escalations.filter(e => e.status === 'closed');
+  const visible = filter === 'all' ? escalations
+    : filter === 'open' ? openEscalations
+    : escalations.filter(e => e.status === 'closed');
+
+  const tabs: { key: Filter; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'open', label: 'Active' },
+    { key: 'closed', label: 'Resolved' },
+  ];
 
   return (
     <div className="w-full md:w-80 h-full bg-card border-r border-border flex flex-col z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
@@ -25,42 +38,39 @@ export function Sidebar({ escalations, selectedPhone, onSelect }: SidebarProps) 
         </div>
       </div>
 
+      {/* Filter tabs */}
+      <div className="flex border-b border-border/50">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setFilter(tab.key)}
+            className={cn(
+              "flex-1 py-2 text-xs font-medium transition-colors",
+              filter === tab.key
+                ? "text-primary border-b-2 border-primary"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {escalations.length === 0 ? (
+        {visible.length === 0 ? (
           <div className="p-4 text-center text-muted-foreground text-sm mt-10">
             <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-20" />
-            No conversations yet
+            No conversations
           </div>
         ) : (
-          <>
-            {openEscalations.length > 0 && (
-              <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-2">
-                Needs Attention
-              </div>
-            )}
-            {openEscalations.map(esc => (
-              <ConversationItem 
-                key={esc.customer_phone} 
-                escalation={esc} 
-                isSelected={selectedPhone === esc.customer_phone}
-                onClick={() => onSelect(esc.customer_phone)}
-              />
-            ))}
-
-            {closedEscalations.length > 0 && (
-              <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-6">
-                Resolved
-              </div>
-            )}
-            {closedEscalations.map(esc => (
-              <ConversationItem 
-                key={esc.customer_phone} 
-                escalation={esc} 
-                isSelected={selectedPhone === esc.customer_phone}
-                onClick={() => onSelect(esc.customer_phone)}
-              />
-            ))}
-          </>
+          visible.map(esc => (
+            <ConversationItem
+              key={esc.customer_phone}
+              escalation={esc}
+              isSelected={selectedPhone === esc.customer_phone}
+              onClick={() => onSelect(esc.customer_phone)}
+            />
+          ))
         )}
       </div>
     </div>
