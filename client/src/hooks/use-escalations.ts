@@ -11,7 +11,7 @@ export function useEscalations() {
       const data = await res.json();
       return data as Escalation[];
     },
-    refetchInterval: 5000, // Poll every 5 seconds
+    refetchInterval: 30000, // Poll every 30 seconds
   });
 }
 

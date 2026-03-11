@@ -45,8 +45,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body || '',
-    icon: '/favicon.png',
-    badge: '/favicon.png',
+    icon: '/logo.png',
+    badge: '/logo.png',
     tag: data.tag || 'wak-notification',
     requireInteraction: true,
     data: { url: data.url || '/' }

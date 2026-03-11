@@ -14,7 +14,7 @@ export function useMessages(phone: string | null) {
       return data as Message[];
     },
     enabled: !!phone,
-    refetchInterval: 3000, // Poll every 3 seconds
+    refetchInterval: 5000, // Poll every 5 seconds
   });
 }
 

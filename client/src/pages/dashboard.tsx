@@ -51,12 +51,12 @@ export default function Dashboard() {
       >
         {/* Logo + Brand */}
         <div className="flex items-center gap-4">
-          <div
+          <img
             data-testid="img-logo"
-            className="w-[140px] h-[40px] bg-white/10 rounded border border-white/20 flex items-center justify-center"
-          >
-            <span className="text-xs font-bold text-white/60 tracking-widest">LOGO</span>
-          </div>
+            src="/logo.png"
+            alt="WAK Solutions"
+            className="h-[40px] w-auto"
+          />
           <div className="hidden sm:block">
             <span className="font-semibold text-sm text-white/90">WAK Solutions</span>
             <span className="text-white/40 mx-2">—</span>

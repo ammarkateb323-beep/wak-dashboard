@@ -142,26 +142,21 @@ export async function registerRoutes(
   app.post(api.messages.send.path, requireAuth, async (req, res) => {
     try {
       const data = api.messages.send.input.parse(req.body);
-      const message = await storage.createMessage({
-        customer_phone: data.customer_phone,
-        message_text: data.message,
-        direction: 'outbound',
-        sender: 'agent'
-      });
 
-      // Call n8n webhook
+      // Call the chatbot service which handles both WhatsApp delivery and DB storage
       if (process.env.N8N_SEND_WEBHOOK) {
-        fetch(process.env.N8N_SEND_WEBHOOK, {
+        const response = await fetch(process.env.N8N_SEND_WEBHOOK, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-webhook-secret': process.env.WEBHOOK_SECRET || ''
           },
           body: JSON.stringify({ customer_phone: data.customer_phone, message: data.message })
-        }).catch(e => console.error("Error calling n8n send webhook", e));
+        });
+        if (!response.ok) throw new Error("Failed to deliver message");
       }
 
-      res.json(message);
+      res.json({ success: true });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
@@ -170,12 +165,6 @@ export async function registerRoutes(
   app.post(api.messages.incoming.path, requireWebhookSecret, async (req, res) => {
     try {
       const data = api.messages.incoming.input.parse(req.body);
-      const message = await storage.createMessage({
-        customer_phone: data.customer_phone,
-        message_text: data.message_text,
-        direction: 'inbound',
-        sender: 'customer'
-      });
 
       const escalation = await storage.getEscalation(data.customer_phone);
       if (escalation && escalation.status === 'open') {
