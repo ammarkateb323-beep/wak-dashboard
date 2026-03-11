@@ -139,9 +139,8 @@ function ActiveChat({ conversation, onClose }: { conversation: Conversation; onC
         <div ref={scrollRef} />
       </div>
 
-      {/* Composer */}
-      {isOpen && (
-        <div className="p-4 bg-white border-t border-border shadow-[0_-4px_24px_rgba(0,0,0,0.02)]">
+      {/* Composer — always visible so agent can reply regardless of status */}
+      <div className="p-4 bg-white border-t border-border shadow-[0_-4px_24px_rgba(0,0,0,0.02)]">
           <form onSubmit={handleSend} className="max-w-4xl mx-auto flex gap-3 bg-muted/30 p-2 rounded-2xl border border-border/50 focus-within:border-primary/30 focus-within:bg-white transition-all">
             <input
               type="text"
@@ -164,7 +163,6 @@ function ActiveChat({ conversation, onClose }: { conversation: Conversation; onC
             Sending as Agent • <span className="font-medium text-primary">SMS Message</span>
           </div>
         </div>
-      )}
     </div>
   );
 }
