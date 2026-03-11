@@ -25,3 +25,12 @@ export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Escalation = typeof escalations.$inferSelect;
 export type InsertEscalation = z.infer<typeof insertEscalationSchema>;
+
+// A unified conversation view: derived from messages table, joined with escalation status
+export interface Conversation {
+  customer_phone: string;
+  last_message: string;
+  last_message_at: string | null;
+  escalation_status: string | null; // 'open' | 'closed' | null (no escalation record)
+  escalation_reason: string | null;
+}

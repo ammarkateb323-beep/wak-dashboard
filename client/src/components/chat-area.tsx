@@ -3,37 +3,37 @@ import { format } from "date-fns";
 import { Send, CheckCircle2, User, Bot, HeadphonesIcon, Info, ArrowLeft } from "lucide-react";
 import { Button } from "./ui-elements";
 import { cn } from "@/lib/utils";
-import type { Message, Escalation } from "@shared/schema";
+import type { Message, Conversation } from "@shared/schema";
 import { useSendMessage, useMessages } from "@/hooks/use-messages";
 import { useCloseEscalation } from "@/hooks/use-escalations";
 
-export function ChatArea({ 
-  escalation, 
-  onClose 
-}: { 
-  escalation: Escalation | null; 
-  onClose: () => void 
+export function ChatArea({
+  conversation,
+  onClose
+}: {
+  conversation: Conversation | null;
+  onClose: () => void
 }) {
-  if (!escalation) {
+  if (!conversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-background text-muted-foreground">
         <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-border flex items-center justify-center mb-4">
           <HeadphonesIcon className="w-8 h-8 text-primary/40" />
         </div>
         <h3 className="text-xl font-medium text-foreground mb-2">Select a conversation</h3>
-        <p className="text-sm">Choose an escalation from the sidebar to view details and reply.</p>
+        <p className="text-sm">Choose a conversation from the sidebar to view messages and reply.</p>
       </div>
     );
   }
 
-  return <ActiveChat escalation={escalation} onClose={onClose} />;
+  return <ActiveChat conversation={conversation} onClose={onClose} />;
 }
 
-function ActiveChat({ escalation, onClose }: { escalation: Escalation; onClose: () => void }) {
-  const { data: messages = [], isLoading } = useMessages(escalation.customer_phone);
+function ActiveChat({ conversation, onClose }: { conversation: Conversation; onClose: () => void }) {
+  const { data: messages = [], isLoading } = useMessages(conversation.customer_phone);
   const { mutate: sendMessage, isPending: isSending } = useSendMessage();
   const { mutate: closeEscalation, isPending: isClosing } = useCloseEscalation();
-  
+
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -47,20 +47,20 @@ function ActiveChat({ escalation, onClose }: { escalation: Escalation; onClose: 
     e.preventDefault();
     if (!text.trim() || isSending) return;
     sendMessage(
-      { customer_phone: escalation.customer_phone, message: text },
+      { customer_phone: conversation.customer_phone, message: text },
       { onSuccess: () => setText("") }
     );
   };
 
   const handleClose = () => {
     if (confirm("Are you sure you want to close this conversation?")) {
-      closeEscalation(escalation.customer_phone, {
+      closeEscalation(conversation.customer_phone, {
         onSuccess: onClose
       });
     }
   };
 
-  const isOpen = escalation.status === 'open';
+  const isOpen = conversation.escalation_status !== 'closed';
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#F7F9F7] relative">
@@ -77,19 +77,19 @@ function ActiveChat({ escalation, onClose }: { escalation: Escalation; onClose: 
             <User className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="font-semibold text-foreground text-sm">{escalation.customer_phone}</h2>
+            <h2 className="font-semibold text-foreground text-sm">{conversation.customer_phone}</h2>
             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
               <span className={cn("w-2 h-2 rounded-full", isOpen ? "bg-green-500" : "bg-gray-400")} />
-              {isOpen ? 'Needs Agent Reply' : 'Resolved'}
+              {isOpen ? 'Active' : 'Resolved'}
             </div>
           </div>
         </div>
-        
+
         {isOpen && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleClose} 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClose}
             isLoading={isClosing}
             className="text-primary hover:text-primary hover:bg-primary/5 border-primary/20"
           >
@@ -99,21 +99,23 @@ function ActiveChat({ escalation, onClose }: { escalation: Escalation; onClose: 
         )}
       </div>
 
-      {/* Escalation Reason Banner */}
-      <div className="bg-orange-50 border-b border-orange-100 px-6 py-3 flex gap-3 text-sm">
-        <Info className="w-5 h-5 text-orange-400 shrink-0" />
-        <div>
-          <span className="font-semibold text-orange-800">Escalation Reason: </span>
-          <span className="text-orange-700">{escalation.escalation_reason}</span>
+      {/* Escalation Reason Banner (only shown when there is an escalation record) */}
+      {conversation.escalation_reason && (
+        <div className="bg-orange-50 border-b border-orange-100 px-6 py-3 flex gap-3 text-sm">
+          <Info className="w-5 h-5 text-orange-400 shrink-0" />
+          <div>
+            <span className="font-semibold text-orange-800">Escalation Reason: </span>
+            <span className="text-orange-700">{conversation.escalation_reason}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {messages.map((msg, idx) => {
-          const showDate = idx === 0 || 
-            new Date(msg.created_at!).getTime() - new Date(messages[idx-1].created_at!).getTime() > 1000 * 60 * 30; // 30 min gap
-            
+          const showDate = idx === 0 ||
+            new Date(msg.created_at!).getTime() - new Date(messages[idx-1].created_at!).getTime() > 1000 * 60 * 30;
+
           return (
             <div key={msg.id}>
               {showDate && (
@@ -149,9 +151,9 @@ function ActiveChat({ escalation, onClose }: { escalation: Escalation; onClose: 
               className="flex-1 bg-transparent border-none focus:ring-0 px-4 text-sm"
               disabled={isSending}
             />
-            <Button 
-              type="submit" 
-              size="icon" 
+            <Button
+              type="submit"
+              size="icon"
               className="w-10 h-10 rounded-xl flex-shrink-0"
               disabled={!text.trim() || isSending}
             >
@@ -188,13 +190,13 @@ function MessageBubble({ message }: { message: Message }) {
             {isCustomer ? 'Customer' : isAI ? 'AI Assistant' : 'You'}
           </span>
         </div>
-        
+
         <div className={cn(
           "px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-sm",
-          isCustomer 
-            ? "bg-white text-foreground border border-border/40 rounded-tl-sm" 
-            : isAI 
-              ? "bg-secondary text-white rounded-tr-sm" 
+          isCustomer
+            ? "bg-white text-foreground border border-border/40 rounded-tl-sm"
+            : isAI
+              ? "bg-secondary text-white rounded-tr-sm"
               : "bg-primary text-white rounded-tr-sm"
         )}>
           {message.message_text}

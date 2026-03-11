@@ -5,11 +5,13 @@ import {
   type Message,
   type InsertMessage,
   type Escalation,
-  type InsertEscalation
+  type InsertEscalation,
+  type Conversation
 } from "@shared/schema";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, sql } from "drizzle-orm";
 
 export interface IStorage {
+  getConversations(): Promise<Conversation[]>;
   getOpenEscalations(): Promise<Escalation[]>;
   getEscalation(phone: string): Promise<Escalation | undefined>;
   createEscalation(escalation: InsertEscalation): Promise<Escalation>;
@@ -19,6 +21,21 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  async getConversations(): Promise<Conversation[]> {
+    const result = await db.execute(sql`
+      SELECT
+        m.customer_phone,
+        (SELECT message_text FROM messages WHERE customer_phone = m.customer_phone ORDER BY created_at DESC LIMIT 1) AS last_message,
+        (SELECT created_at  FROM messages WHERE customer_phone = m.customer_phone ORDER BY created_at DESC LIMIT 1) AS last_message_at,
+        e.status            AS escalation_status,
+        e.escalation_reason
+      FROM (SELECT DISTINCT customer_phone FROM messages) m
+      LEFT JOIN escalations e ON e.customer_phone = m.customer_phone
+      ORDER BY last_message_at DESC NULLS LAST
+    `);
+    return result.rows as unknown as Conversation[];
+  }
+
   async getOpenEscalations(): Promise<Escalation[]> {
     return await db.select().from(escalations).where(eq(escalations.status, 'open')).orderBy(desc(escalations.created_at));
   }

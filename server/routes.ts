@@ -191,6 +191,12 @@ export async function registerRoutes(
     res.json({ registered: !!webAuthnCredential });
   });
 
+  // Conversations Route (all chats from messages table, joined with escalation status)
+  app.get(api.conversations.list.path, requireAuth, async (req, res) => {
+    const conversations = await storage.getConversations();
+    res.json(conversations);
+  });
+
   // Escalation Routes
   app.get(api.escalations.list.path, requireAuth, async (req, res) => {
     const escalations = await storage.getOpenEscalations();

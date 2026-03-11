@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { LogOut, Wifi, WifiOff, Fingerprint } from "lucide-react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { useAuth, useLogout } from "@/hooks/use-auth";
-import { useEscalations } from "@/hooks/use-escalations";
+import { useConversations } from "@/hooks/use-conversations";
 import { usePushNotifications } from "@/hooks/use-push";
 import { Sidebar } from "@/components/sidebar";
 import { ChatArea } from "@/components/chat-area";
@@ -12,7 +12,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const { mutate: logout } = useLogout();
-  const { data: escalations = [], isLoading: isEscalationsLoading, isFetching } = useEscalations();
+  const { data: conversations = [], isLoading: isEscalationsLoading, isFetching } = useConversations();
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   const [connected, setConnected] = useState(true);
 
@@ -37,7 +37,7 @@ export default function Dashboard() {
     );
   }
 
-  const selectedEscalation = escalations.find(e => e.customer_phone === selectedPhone) ?? null;
+  const selectedConversation = conversations.find(c => c.customer_phone === selectedPhone) ?? null;
 
   const handleLogout = () => {
     logout(undefined, { onSuccess: () => setLocation("/login") });
@@ -146,7 +146,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <Sidebar
-              escalations={escalations}
+              conversations={conversations}
               selectedPhone={selectedPhone}
               onSelect={setSelectedPhone}
             />
@@ -156,7 +156,7 @@ export default function Dashboard() {
         {/* Chat: full screen on mobile when chat selected, hidden when none */}
         <div className={`${selectedPhone ? 'flex' : 'hidden md:flex'} flex-1 min-w-0`}>
           <ChatArea
-            escalation={selectedEscalation}
+            conversation={selectedConversation}
             onClose={() => setSelectedPhone(null)}
           />
         </div>

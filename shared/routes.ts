@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { insertMessageSchema, insertEscalationSchema, messages, escalations } from './schema';
+import type { Conversation } from './schema';
 
 export const errorSchemas = {
   validation: z.object({ message: z.string(), field: z.string().optional() }),
@@ -9,6 +10,15 @@ export const errorSchemas = {
 };
 
 export const api = {
+  conversations: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/conversations' as const,
+      responses: {
+        200: z.array(z.custom<Conversation>())
+      }
+    }
+  },
   auth: {
     login: {
       method: 'POST' as const,

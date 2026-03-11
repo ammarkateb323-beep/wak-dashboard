@@ -2,23 +2,23 @@ import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { MessageSquare, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Escalation } from "@shared/schema";
+import type { Conversation } from "@shared/schema";
 
 type Filter = 'all' | 'open' | 'closed';
 
 interface SidebarProps {
-  escalations: Escalation[];
+  conversations: Conversation[];
   selectedPhone: string | null;
   onSelect: (phone: string) => void;
 }
 
-export function Sidebar({ escalations, selectedPhone, onSelect }: SidebarProps) {
+export function Sidebar({ conversations, selectedPhone, onSelect }: SidebarProps) {
   const [filter, setFilter] = useState<Filter>('all');
 
-  const openEscalations = escalations.filter(e => e.status === 'open');
-  const visible = filter === 'all' ? escalations
-    : filter === 'open' ? openEscalations
-    : escalations.filter(e => e.status === 'closed');
+  const activeConversations = conversations.filter(c => c.escalation_status !== 'closed');
+  const visible = filter === 'all' ? conversations
+    : filter === 'open' ? activeConversations
+    : conversations.filter(c => c.escalation_status === 'closed');
 
   const tabs: { key: Filter; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -34,7 +34,7 @@ export function Sidebar({ escalations, selectedPhone, onSelect }: SidebarProps) 
         </div>
         <div>
           <h2 className="font-semibold text-foreground">Inbox</h2>
-          <p className="text-xs text-muted-foreground">{openEscalations.length} open escalations</p>
+          <p className="text-xs text-muted-foreground">{activeConversations.length} active conversations</p>
         </div>
       </div>
 
@@ -63,12 +63,12 @@ export function Sidebar({ escalations, selectedPhone, onSelect }: SidebarProps) 
             No conversations
           </div>
         ) : (
-          visible.map(esc => (
+          visible.map(conv => (
             <ConversationItem
-              key={esc.customer_phone}
-              escalation={esc}
-              isSelected={selectedPhone === esc.customer_phone}
-              onClick={() => onSelect(esc.customer_phone)}
+              key={conv.customer_phone}
+              conversation={conv}
+              isSelected={selectedPhone === conv.customer_phone}
+              onClick={() => onSelect(conv.customer_phone)}
             />
           ))
         )}
@@ -77,10 +77,11 @@ export function Sidebar({ escalations, selectedPhone, onSelect }: SidebarProps) 
   );
 }
 
-function ConversationItem({ escalation, isSelected, onClick }: { escalation: Escalation, isSelected: boolean, onClick: () => void }) {
-  const timeAgo = escalation.created_at 
-    ? formatDistanceToNow(new Date(escalation.created_at), { addSuffix: true }) 
+function ConversationItem({ conversation, isSelected, onClick }: { conversation: Conversation, isSelected: boolean, onClick: () => void }) {
+  const timeAgo = conversation.last_message_at
+    ? formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })
     : '';
+  const isOpen = conversation.escalation_status !== 'closed';
 
   return (
     <button
@@ -90,30 +91,30 @@ function ConversationItem({ escalation, isSelected, onClick }: { escalation: Esc
         isSelected ? "bg-primary/5 border-primary/20 border" : "hover:bg-muted border border-transparent"
       )}
     >
-      {escalation.status === 'open' && !isSelected && (
+      {isOpen && !isSelected && (
         <span className="absolute top-4 right-4 w-2 h-2 rounded-full bg-primary" />
       )}
-      
+
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0 border border-primary/10">
         <span className="text-primary font-medium text-sm">
-          {escalation.customer_phone.slice(-2)}
+          {conversation.customer_phone.slice(-2)}
         </span>
       </div>
-      
+
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-baseline mb-0.5">
           <span className={cn(
             "text-sm font-semibold truncate block",
             isSelected ? "text-primary" : "text-foreground"
           )}>
-            {escalation.customer_phone}
+            {conversation.customer_phone}
           </span>
           <span className="text-[10px] text-muted-foreground flex-shrink-0 whitespace-nowrap ml-2">
             {timeAgo}
           </span>
         </div>
         <p className="text-xs text-muted-foreground truncate line-clamp-1 group-hover:text-foreground/70 transition-colors">
-          {escalation.escalation_reason}
+          {conversation.last_message}
         </p>
       </div>
     </button>
