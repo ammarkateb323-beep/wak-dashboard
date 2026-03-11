@@ -35,6 +35,11 @@ migrate_working_dir/
 .env
 .env.local
 
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
 # Symbolication related
 app.*.symbols
 
