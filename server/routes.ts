@@ -29,10 +29,20 @@ const pushSubscriptions = new Map<string, any>();
 
 // WebAuthn state
 const RP_NAME = "WAK Solutions Agent";
-const RP_ID = process.env.RP_ID || "localhost";
-const RP_ORIGIN = process.env.RP_ORIGIN || `https://${RP_ID}`;
 let webAuthnCredential: any = null;      // stored registered credential
 let currentChallenge: string | undefined; // temp challenge during auth flow
+
+// Derive RP_ID and RP_ORIGIN from the request host so it always matches
+// the domain the browser is actually on (works locally and on Railway)
+function getRpId(req: any): string {
+  if (process.env.RP_ID) return process.env.RP_ID;
+  return req.hostname; // e.g. wak-dashboard-production.up.railway.app
+}
+function getRpOrigin(req: any): string {
+  if (process.env.RP_ORIGIN) return process.env.RP_ORIGIN;
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  return `${proto}://${req.hostname}`;
+}
 
 // Auth check middleware
 const requireAuth = (req: any, res: any, next: any) => {
@@ -102,12 +112,12 @@ export async function registerRoutes(
   app.post('/api/auth/webauthn/register/options', requireAuth, async (req, res) => {
     const options = await generateRegistrationOptions({
       rpName: RP_NAME,
-      rpID: RP_ID,
+      rpID: getRpId(req),
       userID: new TextEncoder().encode('wak-agent'),
       userName: 'agent',
       attestationType: 'none',
       authenticatorSelection: {
-        authenticatorAttachment: 'platform', // device biometrics only (Face ID / Touch ID / fingerprint)
+        authenticatorAttachment: 'platform',
         residentKey: 'preferred',
         userVerification: 'required',
       },
@@ -122,8 +132,8 @@ export async function registerRoutes(
       const { verified, registrationInfo } = await verifyRegistrationResponse({
         response: req.body,
         expectedChallenge: currentChallenge!,
-        expectedOrigin: RP_ORIGIN,
-        expectedRPID: RP_ID,
+        expectedOrigin: getRpOrigin(req),
+        expectedRPID: getRpId(req),
       });
       if (verified && registrationInfo) {
         webAuthnCredential = registrationInfo.credential;
@@ -143,7 +153,7 @@ export async function registerRoutes(
       return res.status(400).json({ message: "No biometric registered" });
     }
     const options = await generateAuthenticationOptions({
-      rpID: RP_ID,
+      rpID: getRpId(req),
       allowCredentials: [{ id: webAuthnCredential.id }],
       userVerification: 'required',
     });
@@ -157,8 +167,8 @@ export async function registerRoutes(
       const { verified } = await verifyAuthenticationResponse({
         response: req.body,
         expectedChallenge: currentChallenge!,
-        expectedOrigin: RP_ORIGIN,
-        expectedRPID: RP_ID,
+        expectedOrigin: getRpOrigin(req),
+        expectedRPID: getRpId(req),
         credential: webAuthnCredential,
       });
       if (verified) {

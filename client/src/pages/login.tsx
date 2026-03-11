@@ -92,7 +92,7 @@ export default function Login() {
           <img
             src="/logo.png"
             alt="WAK Solutions"
-            className="h-[64px] w-auto object-contain mb-4"
+            className="w-[120px] h-auto object-contain mb-4"
           />
           <h1 className="text-xl font-bold text-foreground tracking-tight">WAK Solutions</h1>
           <p className="text-sm text-muted-foreground mt-1">Your Strategic AI Partner</p>
