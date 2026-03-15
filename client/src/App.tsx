@@ -9,6 +9,7 @@ import Login from "./pages/login";
 import Guide from "./pages/guide";
 import Statistics from "./pages/statistics";
 import ChatbotConfig from "./pages/ChatbotConfig";
+import Meetings from "./pages/Meetings";
 
 function Router() {
   return (
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/guide" component={Guide} />
       <Route path="/statistics" component={Statistics} />
       <Route path="/chatbot-config" component={ChatbotConfig} />
+      <Route path="/meetings" component={Meetings} />
       <Route path="/" component={Dashboard} />
       <Route component={NotFound} />
     </Switch>

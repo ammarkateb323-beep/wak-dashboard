@@ -459,6 +459,36 @@ Rules:
     }
   });
 
+  // Meetings Routes
+  app.get('/api/meetings', requireAuth, async (req, res) => {
+    try {
+      const filter = (req.query.filter as string) || 'all';
+      let where = '';
+      if (filter === 'upcoming') where = "WHERE status = 'pending'";
+      else if (filter === 'completed') where = "WHERE status = 'completed'";
+      const result = await pool.query(
+        `SELECT id, customer_phone, agent, meeting_link, agreed_time, status, created_at
+         FROM meetings ${where} ORDER BY created_at DESC`
+      );
+      res.json(result.rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch('/api/meetings/:id/complete', requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `UPDATE meetings SET status = 'completed' WHERE id = $1 RETURNING *`,
+        [req.params.id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ message: 'Meeting not found' });
+      res.json(result.rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Push Notification Routes
   app.get(api.push.vapidPublicKey.path, requireAuth, (req, res) => {
     res.json({ publicKey: VAPID_PUBLIC_KEY });
