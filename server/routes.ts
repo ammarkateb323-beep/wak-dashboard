@@ -321,7 +321,7 @@ export async function registerRoutes(
 
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
-        return res.status(503).json({ message: "OPENAI_API_KEY is not configured on the server." });
+        return res.status(503).json({ message: "OPENAI_API_KEY is not configured. Add it to wak-dash/.env and restart the server." });
       }
 
       const msgs = await storage.getInboundMessagesForSummary(fromDate, toDate);
