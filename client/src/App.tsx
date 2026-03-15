@@ -8,6 +8,7 @@ import Dashboard from "./pages/dashboard";
 import Login from "./pages/login";
 import Guide from "./pages/guide";
 import Statistics from "./pages/statistics";
+import ChatbotConfig from "./pages/ChatbotConfig";
 
 function Router() {
   return (
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/guide" component={Guide} />
       <Route path="/statistics" component={Statistics} />
+      <Route path="/chatbot-config" component={ChatbotConfig} />
       <Route path="/" component={Dashboard} />
       <Route component={NotFound} />
     </Switch>

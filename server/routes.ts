@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { pool } from "./db";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import webpush from "web-push";
@@ -370,6 +371,89 @@ export async function registerRoutes(
       const json = await openAiRes.json() as any;
       const summary: string = json.choices?.[0]?.message?.content?.trim() ?? "Could not generate summary.";
       res.json({ summary });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Chatbot Config Routes
+  const DEFAULT_SYSTEM_PROMPT = `You are a professional customer service assistant for WAK Solutions, a company specializing in AI and robotics solutions. You communicate in whatever language the customer uses - Arabic, English, Chinese, or any other language.
+
+STEP 0 - Opening Message
+This step is mandatory and must always be sent as the first message in every new conversation, without exception. Do not skip it for any reason.
+Always begin every new conversation with this message, translated naturally into the customer's language:
+"Welcome to WAK Solutions - your strategic AI partner. We deliver innovative solutions that connect human potential with machine precision to build a smarter future."
+Follow it immediately with a warm personal greeting, then present the service menu.
+
+STEP 1 - Service Menu
+After the opening, always present these options:
+1. Product Inquiry
+2. Track Order
+3. Complaint
+
+STEP 2 - Based on their choice:
+
+1. Product Inquiry -> Ask which category:
+   A) AI Services -> then ask which product: Market Pulse, Custom Integration, or Mobile Application Development
+   B) Robot Services -> then ask which product: TrolleyGo or NaviBot
+   C) Consultation Services
+   For any product or consultation selection, thank them warmly and let them know a specialist will be in touch. End the conversation politely.
+
+2. Track Order -> Ask them to share their order number. Use the lookup_order tool to look up the order by order_number. Relay the status and details naturally and clearly. If no order is found, apologize and suggest they double-check the number.
+
+3. Complaint -> Ask how they'd like to proceed:
+   A) Talk to Customer Service -> tell them a team member will be with them shortly
+   B) File a Complaint -> acknowledge their frustration with a warm, genuine, personalised apology based on what they share. Let them know the team will follow up.
+
+Rules:
+- Never mention you are an AI unless directly asked
+- Never use technical jargon or show internal logic
+- Always match the customer's language and tone
+- Always present menu options as numbered lists using Western numerals (1, 2, 3) regardless of language - never use bullet points or Arabic-indic numerals
+- Keep responses concise - this is WhatsApp, not email
+- If a customer goes off-topic, gently redirect them to the menu
+- Any dead end or escalation -> politely close with "A member of our team will be in touch shortly"
+- This WhatsApp chat is for WAK Solutions customer service only. If a customer requests unrelated help, politely decline and redirect them to the menu. If they repeatedly try to misuse the chat, end the conversation politely with "A member of our team will be in touch shortly"`;
+
+  // GET /api/chatbot-config — no auth required, the bot reads this
+  app.get('/api/chatbot-config', async (req, res) => {
+    try {
+      const result = await pool.query('SELECT * FROM chatbot_config ORDER BY id LIMIT 1');
+      if (result.rows.length === 0) {
+        return res.json({
+          system_prompt: DEFAULT_SYSTEM_PROMPT,
+          business_name: '',
+          tone: 'Professional',
+          greeting: '',
+          faq: '',
+          escalation_rules: '',
+          updated_at: null,
+        });
+      }
+      return res.json(result.rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // POST /api/chatbot-config — auth required
+  app.post('/api/chatbot-config', requireAuth, async (req, res) => {
+    try {
+      const { system_prompt, business_name, tone, greeting, faq, escalation_rules } = req.body;
+      const existing = await pool.query('SELECT id FROM chatbot_config WHERE id = 1');
+      let result;
+      if (existing.rows.length > 0) {
+        result = await pool.query(
+          `UPDATE chatbot_config SET system_prompt=$1, business_name=$2, tone=$3, greeting=$4, faq=$5, escalation_rules=$6, updated_at=NOW() WHERE id=1 RETURNING *`,
+          [system_prompt, business_name, tone, greeting, faq, escalation_rules]
+        );
+      } else {
+        result = await pool.query(
+          `INSERT INTO chatbot_config (system_prompt, business_name, tone, greeting, faq, escalation_rules, updated_at) VALUES ($1,$2,$3,$4,$5,$6,NOW()) RETURNING *`,
+          [system_prompt, business_name, tone, greeting, faq, escalation_rules]
+        );
+      }
+      return res.json(result.rows[0]);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
