@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
-import { LogOut, Wifi, WifiOff, Fingerprint, Bell, Share, X } from "lucide-react";
+import { useLocation, Link } from "wouter";
+import { LogOut, Wifi, WifiOff, Fingerprint, Bell, Share, X, BookOpen } from "lucide-react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { useAuth, useLogout } from "@/hooks/use-auth";
 import { useConversations } from "@/hooks/use-conversations";
@@ -107,6 +107,13 @@ export default function Dashboard() {
               </>
             )}
           </div>
+
+          <Link href="/guide">
+            <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
+              <BookOpen className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Guide</span>
+            </a>
+          </Link>
 
           <button
             onClick={handleRegisterBiometric}
