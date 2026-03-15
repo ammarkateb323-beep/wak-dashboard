@@ -36,6 +36,7 @@ function ActiveChat({ conversation, onClose }: { conversation: Conversation; onC
 
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -143,10 +144,12 @@ function ActiveChat({ conversation, onClose }: { conversation: Conversation; onC
       <div className="p-4 bg-white border-t border-border shadow-[0_-4px_24px_rgba(0,0,0,0.02)]">
           <form onSubmit={handleSend} className="max-w-4xl mx-auto flex gap-3 bg-muted/30 p-2 rounded-2xl border border-border/50 focus-within:border-primary/30 focus-within:bg-white transition-all">
             <input
+              ref={inputRef}
               type="text"
+              inputMode="text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              onTouchEnd={(e) => (e.currentTarget as HTMLInputElement).focus()}
+              onTouchStart={() => setTimeout(() => inputRef.current?.focus(), 0)}
               placeholder="Reply to customer..."
               className="flex-1 bg-transparent border-none focus:ring-0 px-4 text-sm"
               disabled={isSending}
