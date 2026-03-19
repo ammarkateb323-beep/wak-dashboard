@@ -12,8 +12,20 @@ interface Meeting {
   agent: string | null;
   meeting_link: string;
   agreed_time: string | null;
+  scheduled_at: string | null;
   status: MeetingStatus;
   created_at: string;
+}
+
+function formatScheduledAt(iso: string): string {
+  const d = new Date(iso);
+  // Convert UTC to KSA (UTC+3) for display
+  const ksa = new Date(d.getTime() + 3 * 60 * 60 * 1000);
+  const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const hh = String(ksa.getUTCHours()).padStart(2, "0");
+  const mm = String(ksa.getUTCMinutes()).padStart(2, "0");
+  return `${days[ksa.getUTCDay()]} ${ksa.getUTCDate()} ${months[ksa.getUTCMonth()]} ${ksa.getUTCFullYear()} · ${hh}:${mm} AST`;
 }
 
 // ── Availability helpers ──────────────────────────────────────────────────────
@@ -236,16 +248,13 @@ export default function Meetings() {
                       Meeting Link
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Agreed Time
+                      Scheduled (AST)
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       Agent
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       Status
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Created
                     </th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -257,28 +266,32 @@ export default function Meetings() {
                         {m.customer_phone}
                       </td>
                       <td className="px-4 py-3">
-                        <a
-                          href={m.meeting_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-[#0F510F] hover:underline font-mono text-xs"
-                        >
-                          {m.meeting_link.replace("https://meet.jit.si/", "jit.si/")}
-                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                        </a>
-                      </td>
-                      <td className="px-4 py-3 text-foreground">
-                        {m.agreed_time ? (
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                            {m.agreed_time}
-                          </span>
+                        {m.meeting_link ? (
+                          <a
+                            href={m.meeting_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-[#0F510F] hover:underline font-mono text-xs"
+                          >
+                            {m.meeting_link.replace("https://meet.jit.si/", "jit.si/")}
+                            <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                          </a>
                         ) : (
-                          <span className="text-muted-foreground text-xs italic">Awaiting reply</span>
+                          <span className="text-muted-foreground text-xs italic">Pending booking</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {m.agent ?? <span className="italic text-xs">—</span>}
+                      <td className="px-4 py-3 text-foreground text-xs whitespace-nowrap">
+                        {m.scheduled_at ? (
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                            {formatScheduledAt(m.scheduled_at)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground italic">Not booked yet</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
+                        {m.agent ?? <span className="italic">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -295,13 +308,6 @@ export default function Meetings() {
                           )}
                           {m.status === "completed" ? "Completed" : "Pending"}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
-                        {new Date(m.created_at).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {m.status === "pending" && (

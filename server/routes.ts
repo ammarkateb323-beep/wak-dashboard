@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { pool } from "./db";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import { notifyManagerNewBooking } from "./email";
 import webpush from "web-push";
 import {
   generateRegistrationOptions,
@@ -378,43 +379,48 @@ export async function registerRoutes(
   });
 
   // Chatbot Config Routes
-  const DEFAULT_SYSTEM_PROMPT = `You are a professional customer service assistant for WAK Solutions, a company specializing in AI and robotics solutions. You communicate in whatever language the customer uses - Arabic, English, Chinese, or any other language.
+  const DEFAULT_SYSTEM_PROMPT = `You are a professional customer service assistant for WAK Solutions, a company specializing in AI and robotics solutions. You communicate fluently in whatever language the customer uses — Arabic, English, or any other language. Always match their dialect and tone naturally.
+STEP 0 — Opening Message (MANDATORY)
+Every new conversation must begin with this message, translated naturally into the customer's language:
+'Welcome to WAK Solutions — your strategic AI partner. We deliver innovative solutions that connect human potential with machine precision to build a smarter future.'
+Follow immediately with a warm, personal greeting, then present the service menu.
+Never skip this step for any reason.
+STEP 1 — Service Menu
+Always present these options after the opening:
 
-STEP 0 - Opening Message
-This step is mandatory and must always be sent as the first message in every new conversation, without exception. Do not skip it for any reason.
-Always begin every new conversation with this message, translated naturally into the customer's language:
-"Welcome to WAK Solutions - your strategic AI partner. We deliver innovative solutions that connect human potential with machine precision to build a smarter future."
-Follow it immediately with a warm personal greeting, then present the service menu.
+Product Inquiry
+Track Order
+Complaint
 
-STEP 1 - Service Menu
-After the opening, always present these options:
-1. Product Inquiry
-2. Track Order
-3. Complaint
+STEP 2 — Handle their choice:
 
-STEP 2 - Based on their choice:
+Product Inquiry → Ask which category:
+A) AI Services → ask which product: Market Pulse, Custom Integration, or Mobile Application Development
+B) Robot Services → ask which product: TrolleyGo or NaviBot
+C) Consultation Services
+For any selection, thank them warmly and inform them a specialist will be in touch. Then ask: 'Before we wrap up, would you like to schedule a meeting with our team or speak with a customer service agent on WhatsApp?'
 
-1. Product Inquiry -> Ask which category:
-   A) AI Services -> then ask which product: Market Pulse, Custom Integration, or Mobile Application Development
-   B) Robot Services -> then ask which product: TrolleyGo or NaviBot
-   C) Consultation Services
-   For any product or consultation selection, thank them warmly and let them know a specialist will be in touch. End the conversation politely.
 
-2. Track Order -> Ask them to share their order number. Use the lookup_order tool to look up the order by order_number. Relay the status and details naturally and clearly. If no order is found, apologize and suggest they double-check the number.
+If they choose meeting → send them the booking link
+If they choose agent → trigger human handover
 
-3. Complaint -> Ask how they'd like to proceed:
-   A) Talk to Customer Service -> tell them a team member will be with them shortly
-   B) File a Complaint -> acknowledge their frustration with a warm, genuine, personalised apology based on what they share. Let them know the team will follow up.
+
+Track Order → Ask for their order number. Use the lookup_order tool to retrieve it. Relay the status clearly and naturally. If not found, apologize and ask them to double-check the number.
+Complaint → Ask how they'd like to proceed:
+A) Talk to Customer Service → trigger human handover
+B) File a Complaint → acknowledge their frustration with a warm, genuine, personalized apology based on what they share. Confirm the team will follow up shortly.
 
 Rules:
-- Never mention you are an AI unless directly asked
-- Never use technical jargon or show internal logic
-- Always match the customer's language and tone
-- Always present menu options as numbered lists using Western numerals (1, 2, 3) regardless of language - never use bullet points or Arabic-indic numerals
-- Keep responses concise - this is WhatsApp, not email
-- If a customer goes off-topic, gently redirect them to the menu
-- Any dead end or escalation -> politely close with "A member of our team will be in touch shortly"
-- This WhatsApp chat is for WAK Solutions customer service only. If a customer requests unrelated help, politely decline and redirect them to the menu. If they repeatedly try to misuse the chat, end the conversation politely with "A member of our team will be in touch shortly"`;
+
+Never reveal you are an AI unless directly asked
+Never use technical jargon or expose internal logic
+Always match the customer's language, dialect, and tone
+Always use Western numerals (1, 2, 3) for menu options — never bullet points or Arabic-Indic numerals
+Keep responses concise — this is WhatsApp, not email
+If a customer goes off-topic, gently redirect them to the menu
+Any dead end or escalation → close with: 'A member of our team will be in touch shortly'
+This chat is for WAK Solutions customer service only. If someone tries to misuse it, politely decline and redirect. If they persist, end with: 'A member of our team will be in touch shortly'
+Never send the booking link unless the customer explicitly agrees to schedule a meeting`;
 
   // GET /api/chatbot-config — no auth required, the bot reads this
   app.get('/api/chatbot-config', async (req, res) => {
@@ -460,6 +466,32 @@ Rules:
     }
   });
 
+  // POST /api/meetings/create-token — internal, called by the Python agent
+  // Creates a meeting row with a 24-hour booking token and returns it.
+  app.post('/api/meetings/create-token', async (req, res) => {
+    try {
+      const secret = req.headers['x-webhook-secret'];
+      if (secret !== process.env.WEBHOOK_SECRET) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      const { customer_phone } = req.body;
+      if (!customer_phone) {
+        return res.status(400).json({ message: 'customer_phone is required' });
+      }
+      const crypto = await import('crypto');
+      const token = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await pool.query(
+        `INSERT INTO meetings (customer_phone, meeting_link, meeting_token, token_expires_at, status, created_at)
+         VALUES ($1, '', $2, $3, 'pending', NOW())`,
+        [customer_phone, token, expiresAt]
+      );
+      return res.json({ token });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Meetings Routes
   app.get('/api/meetings', requireAuth, async (req, res) => {
     try {
@@ -468,7 +500,7 @@ Rules:
       if (filter === 'upcoming') where = "WHERE status = 'pending'";
       else if (filter === 'completed') where = "WHERE status = 'completed'";
       const result = await pool.query(
-        `SELECT id, customer_phone, agent, meeting_link, agreed_time, status, created_at
+        `SELECT id, customer_phone, agent, meeting_link, agreed_time, scheduled_at, customer_email, status, created_at
          FROM meetings ${where} ORDER BY created_at DESC`
       );
       res.json(result.rows);
@@ -655,7 +687,8 @@ Rules:
 
       // Send WhatsApp confirmation
       const ksaDt = new Date(scheduledUtc.getTime() + KSA_OFFSET_MS);
-      const confirmMsg = `Your meeting is confirmed for ${formatKsaDateTime(ksaDt)} KSA time. Your meeting link will be sent to you 15 minutes before the meeting.`;
+      const ksaLabel = formatKsaDateTime(ksaDt);
+      const confirmMsg = `Your meeting is confirmed for ${ksaLabel} KSA time. Your meeting link will be sent to you 15 minutes before the meeting.`;
       if (process.env.N8N_SEND_WEBHOOK) {
         fetch(process.env.N8N_SEND_WEBHOOK, {
           method: 'POST',
@@ -664,7 +697,15 @@ Rules:
         }).catch(e => console.error('WhatsApp confirmation error:', e));
       }
 
-      res.json({ success: true, ksa_label: formatKsaDateTime(ksaDt) });
+      // Notify manager of new booking (fire-and-forget, non-blocking)
+      notifyManagerNewBooking({
+        customerPhone: meeting.customer_phone,
+        dateTimeLabel: ksaLabel,
+        meetingLink,
+        scheduledUtc,
+      }).catch(e => console.error('Manager notification email error:', e));
+
+      res.json({ success: true, ksa_label: ksaLabel });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
