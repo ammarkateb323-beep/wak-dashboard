@@ -570,6 +570,36 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
     }
   });
 
+  // GET /api/availability/booked?weekStart=YYYY-MM-DD
+  // Returns meetings that have been booked (scheduled_at set, not completed) within the week.
+  // Returns rows as { date: "YYYY-MM-DD", time: "HH:00" } in KSA (UTC+3).
+  app.get('/api/availability/booked', requireAuth, async (req, res) => {
+    try {
+      const weekStart = (req.query.weekStart as string) || new Date().toISOString().slice(0, 10);
+      const KSA_MS = 3 * 60 * 60 * 1000;
+      // weekStart is a KSA date — convert to UTC boundaries for the query
+      const [yr, mo, dy] = weekStart.split('-').map(Number);
+      const weekStartUtc = new Date(Date.UTC(yr, mo - 1, dy, 0, 0, 0) - KSA_MS);
+      const weekEndUtc   = new Date(weekStartUtc.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const result = await pool.query(
+        `SELECT scheduled_at FROM meetings
+         WHERE scheduled_at >= $1 AND scheduled_at < $2
+           AND scheduled_at IS NOT NULL
+           AND status != 'completed'`,
+        [weekStartUtc, weekEndUtc]
+      );
+      const rows = result.rows.map((r: { scheduled_at: Date }) => {
+        const ksa = new Date(new Date(r.scheduled_at).getTime() + KSA_MS);
+        const date = ksa.toISOString().slice(0, 10);
+        const time = `${String(ksa.getUTCHours()).padStart(2, '0')}:00`;
+        return { date, time };
+      });
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Public Booking Routes (no auth) ───────────────────────────────────────
 
   const KSA_OFFSET_MS = 3 * 60 * 60 * 1000; // UTC+3

@@ -66,6 +66,7 @@ export default function Meetings() {
   // Availability state
   const [weekStart, setWeekStart] = useState<Date>(() => getMondayOf(new Date()));
   const [blockedSlots, setBlockedSlots] = useState<Set<string>>(new Set());
+  const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [togglingSlot, setTogglingSlot] = useState<string | null>(null);
 
@@ -73,14 +74,23 @@ export default function Meetings() {
     if (!isAuthLoading && !isAuthenticated) setLocation("/login");
   }, [isAuthLoading, isAuthenticated, setLocation]);
 
-  // Fetch blocked slots for current week
+  // Fetch blocked and booked slots for current week
   const fetchSlots = useCallback(async () => {
     setLoadingSlots(true);
     try {
-      const res = await fetch(`/api/availability?weekStart=${toDateStr(weekStart)}`, { credentials: "include" });
-      if (!res.ok) return;
-      const rows: { date: string; time: string }[] = await res.json();
-      setBlockedSlots(new Set(rows.map(r => `${r.date}|${r.time}`)));
+      const ws = toDateStr(weekStart);
+      const [blockedRes, bookedRes] = await Promise.all([
+        fetch(`/api/availability?weekStart=${ws}`, { credentials: "include" }),
+        fetch(`/api/availability/booked?weekStart=${ws}`, { credentials: "include" }),
+      ]);
+      if (blockedRes.ok) {
+        const rows: { date: string; time: string }[] = await blockedRes.json();
+        setBlockedSlots(new Set(rows.map(r => `${r.date}|${r.time}`)));
+      }
+      if (bookedRes.ok) {
+        const rows: { date: string; time: string }[] = await bookedRes.json();
+        setBookedSlots(new Set(rows.map(r => `${r.date}|${r.time}`)));
+      }
     } catch (_) {} finally {
       setLoadingSlots(false);
     }
@@ -339,7 +349,7 @@ export default function Meetings() {
             <h2 className="text-base font-semibold text-foreground">Manage Availability</h2>
           </div>
           <p className="text-xs text-muted-foreground">
-            Click a slot to block or unblock it. Blocked slots (red) cannot be booked by customers. All times are KSA (UTC+3).
+            Click a slot to block or unblock it. Blocked slots (red) cannot be booked by customers. Booked slots (blue) are already taken by a customer. All times are KSA (UTC+3).
           </p>
 
           {/* Week navigation */}
@@ -387,7 +397,21 @@ export default function Meetings() {
                           const dateStr = toDateStr(d);
                           const key = `${dateStr}|${hour}`;
                           const isBlocked = blockedSlots.has(key);
+                          const isBooked = bookedSlots.has(key);
                           const isToggling = togglingSlot === key;
+                          if (isBooked) {
+                            return (
+                              <td key={di} className="px-2 py-1 text-center">
+                                <div
+                                  title="This slot has been booked by a customer"
+                                  className="w-full h-8 rounded-md text-xs font-medium flex items-center justify-center gap-1 bg-blue-100 text-blue-700 border border-blue-200 cursor-default"
+                                >
+                                  <span className="hidden sm:inline">Booked</span>
+                                  <span className="sm:hidden">●</span>
+                                </div>
+                              </td>
+                            );
+                          }
                           return (
                             <td key={di} className="px-2 py-1 text-center">
                               <button
