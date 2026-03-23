@@ -57,7 +57,7 @@ export function registerAgentRoutes(app: any, requireAdmin: any): void {
             WHERE e.status = 'closed' AND e.created_at >= DATE_TRUNC('week', NOW())
           )::int AS resolved_this_week,
           COUNT(e.customer_phone) FILTER (WHERE e.status = 'closed')::int AS total_resolved,
-          (SELECT COUNT(*)::int FROM meetings m WHERE m.agent = a.name AND m.status = 'completed') AS meetings_completed
+          (SELECT COUNT(*)::int FROM meetings m WHERE m.agent_id = a.id AND m.status = 'completed') AS meetings_completed
         FROM agents a
         LEFT JOIN escalations e ON e.assigned_agent_id = a.id
         GROUP BY a.id, a.name, a.is_active

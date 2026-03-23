@@ -21,6 +21,10 @@ if (!process.env.DASHBOARD_PASSWORD) {
   throw new Error("Missing required environment variable: DASHBOARD_PASSWORD");
 }
 
+if (!process.env.DAILY_API_KEY) {
+  console.error('[startup] DAILY_API_KEY is not set — meeting room creation will fail at booking time');
+}
+
 // Setup web-push
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
@@ -334,6 +338,15 @@ export async function registerRoutes(
   app.post(api.escalations.close.path, requireAuth, async (req, res) => {
     try {
       const { customer_phone } = api.escalations.close.input.parse(req.body);
+
+      // Fetch escalation id and assigned agent before closing
+      const escRes = await pool.query(
+        `SELECT id, assigned_agent_id FROM escalations WHERE customer_phone=$1 LIMIT 1`,
+        [customer_phone]
+      );
+      const escalationId: number | null = escRes.rows[0]?.id ?? null;
+      const agentId: number | null = (req.session.agentId as number | null) ?? escRes.rows[0]?.assigned_agent_id ?? null;
+
       await storage.closeEscalation(customer_phone);
 
       // Call n8n webhook
@@ -349,7 +362,7 @@ export async function registerRoutes(
       }
 
       // Send post-chat survey (fire-and-forget)
-      sendSurveyToCustomer(customer_phone, null, null);
+      sendSurveyToCustomer(customer_phone, agentId, escalationId);
 
       res.json({ success: true });
     } catch (err: any) {
@@ -404,10 +417,10 @@ export async function registerRoutes(
   app.patch('/api/escalations/:phone/assign', requireAdmin, async (req, res) => {
     try {
       const phone = decodeURIComponent(req.params.phone);
-      const { agent_id } = z.object({ agent_id: z.number().nullable() }).parse(req.body);
+      const { agentId } = z.object({ agentId: z.number().nullable() }).parse(req.body);
       await pool.query(
         `UPDATE escalations SET assigned_agent_id=$1 WHERE customer_phone=$2`,
-        [agent_id, phone]
+        [agentId, phone]
       );
       res.json({ success: true });
     } catch (err: any) {
@@ -667,8 +680,12 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
       if (filter === 'upcoming') where = "WHERE status = 'pending'";
       else if (filter === 'completed') where = "WHERE status = 'completed'";
       const result = await pool.query(
-        `SELECT id, customer_phone, agent, meeting_link, meeting_token, agreed_time, scheduled_at, customer_email, status, created_at
-         FROM meetings ${where} ORDER BY created_at DESC`
+        `SELECT m.id, m.customer_phone, m.agent_id, a.name AS agent_name,
+                m.meeting_link, m.meeting_token, m.agreed_time, m.scheduled_at,
+                m.customer_email, m.status, m.created_at
+         FROM meetings m
+         LEFT JOIN agents a ON a.id = m.agent_id
+         ${where} ORDER BY m.created_at DESC`
       );
       res.json(result.rows);
     } catch (err: any) {
@@ -784,14 +801,15 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
       );
       if (result.rows.length === 0) return res.status(404).json({ message: 'Meeting not found.' });
       const m = result.rows[0];
-      // Extract Jitsi room name from stored link (e.g. "https://meet.jit.si/WAK-abc" → "WAK-abc")
-      const jitsiRoom = m.meeting_link
-        ? m.meeting_link.replace('https://meet.jit.si/', '')
-        : null;
       const scheduledTime = m.scheduled_at
         ? new Date(new Date(m.scheduled_at).getTime() + 3 * 60 * 60 * 1000).toISOString()
         : null;
-      res.json({ meeting_id: m.id, jitsi_room: jitsiRoom, scheduled_time: scheduledTime, status: m.status });
+      res.json({
+        meeting_id: m.id,
+        meeting_link: m.meeting_link || null,
+        scheduled_time: scheduledTime,
+        status: m.status,
+      });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -928,9 +946,28 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
         return res.status(409).json({ message: 'This slot is not available. Please choose another.' });
       }
 
-      // Generate Jitsi room name; store raw Jitsi URL in DB for room name extraction
-      const jitsiSuffix = crypto.randomBytes(8).toString('base64url').slice(0, 10);
-      const jitsiLink = `https://meet.jit.si/WAK-${jitsiSuffix}`;
+      // Create Daily.co room via API
+      const dailyRes = await fetch('https://api.daily.co/v1/rooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.DAILY_API_KEY}`,
+        },
+        body: JSON.stringify({
+          properties: {
+            enable_prejoin_ui: false,
+            enable_knocking: false,
+            exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+          },
+        }),
+      });
+      if (!dailyRes.ok) {
+        const errText = await dailyRes.text();
+        throw new Error(`Daily.co room creation failed: ${errText}`);
+      }
+      const dailyData = await dailyRes.json() as any;
+      const meetingLink = dailyData.url as string; // e.g. https://wak.daily.co/abc123
+
       // Branded meeting link sent to customers
       const rawBase = (
         process.env.APP_URL ||
@@ -943,7 +980,7 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
 
       await pool.query(
         `UPDATE meetings SET meeting_link=$1, scheduled_at=$2, link_sent=FALSE WHERE id=$3`,
-        [jitsiLink, scheduledUtc, meeting.id]
+        [meetingLink, scheduledUtc, meeting.id]
       );
 
       // Send WhatsApp confirmation

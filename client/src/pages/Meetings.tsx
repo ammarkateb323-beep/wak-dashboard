@@ -9,7 +9,8 @@ type FilterType = "all" | "upcoming" | "completed";
 interface Meeting {
   id: number;
   customer_phone: string;
-  agent: string | null;
+  agent_id: number | null;
+  agent_name: string | null;
   meeting_link: string;
   meeting_token: string | null;
   agreed_time: string | null;
@@ -303,7 +304,7 @@ export default function Meetings() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">
-                        {m.agent ?? <span className="italic">—</span>}
+                        {m.agent_name ?? <span className="italic">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         <span

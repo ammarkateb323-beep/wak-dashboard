@@ -1,21 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface MeetingData {
   meeting_id: number;
-  jitsi_room: string | null;
+  meeting_link: string | null;
   scheduled_time: string | null;
   status: string;
 }
 
 type PageState = "loading" | "invalid" | "meeting" | "done";
-
-declare global {
-  interface Window {
-    JitsiMeetExternalAPI: any;
-  }
-}
 
 function formatScheduledTime(iso: string): string {
   const d = new Date(iso);
@@ -35,8 +29,7 @@ export default function MeetingPage() {
   const [state, setState] = useState<PageState>("loading");
   const [meeting, setMeeting] = useState<MeetingData | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const jitsiContainerRef = useRef<HTMLDivElement>(null);
-  const jitsiApiRef = useRef<any>(null);
+  const [meetingEnded, setMeetingEnded] = useState(false);
 
   // Fetch meeting details
   useEffect(() => {
@@ -49,7 +42,7 @@ export default function MeetingPage() {
           return;
         }
         const data: MeetingData = await res.json();
-        if (!data.jitsi_room) {
+        if (!data.meeting_link) {
           setErrorMsg("Meeting room has not been set up yet.");
           setState("invalid");
           return;
@@ -63,69 +56,21 @@ export default function MeetingPage() {
       });
   }, [token]);
 
-  // Load Jitsi IFrame API and initialise the meeting once we're in "meeting" state
+  // Listen for Daily.co postMessage when call ends
   useEffect(() => {
-    if (state !== "meeting" || !meeting?.jitsi_room) return;
-
-    // Dynamically load the Jitsi external_api.js script
-    const script = document.createElement("script");
-    script.src = "https://meet.jit.si/external_api.js";
-    script.async = true;
-    script.onload = () => initJitsi();
-    document.head.appendChild(script);
-
-    function initJitsi() {
-      if (!jitsiContainerRef.current || !meeting?.jitsi_room) return;
-
-      const api = new window.JitsiMeetExternalAPI("meet.jit.si", {
-        roomName: meeting.jitsi_room,
-        parentNode: jitsiContainerRef.current,
-        configOverwrite: {
-          prejoinPageEnabled: false,
-          startWithAudioMuted: false,
-          startWithVideoMuted: false,
-          disableThirdPartyRequests: true,
-          hideConferenceTimer: false,
-          hideConferenceSubject: true,
-          subject: 'WAK Solutions Meeting',
-        },
-        interfaceConfigOverwrite: {
-          SHOW_JITSI_WATERMARK: false,
-          SHOW_WATERMARK_FOR_GUESTS: false,
-          SHOW_BRAND_WATERMARK: false,
-          BRAND_WATERMARK_LINK: '',
-          SHOW_POWERED_BY: false,
-          SHOW_PROMOTIONAL_CLOSE_PAGE: false,
-          DISPLAY_WELCOME_PAGE_CONTENT: false,
-          DISPLAY_WELCOME_PAGE_TOOLBAR_ADDITIONAL_CONTENT: false,
-          SHOW_CHROME_EXTENSION_BANNER: false,
-          MOBILE_APP_PROMO: false,
-        },
-      });
-
-      jitsiApiRef.current = api;
-
-      const handleEnd = () => {
-        api.dispose();
-        jitsiApiRef.current = null;
-        setState("done");
-      };
-
-      api.addEventListener("readyToClose", handleEnd);
-      api.addEventListener("videoConferenceLeft", handleEnd);
-    }
-
-    return () => {
-      // Cleanup on unmount
-      if (jitsiApiRef.current) {
-        jitsiApiRef.current.dispose();
-        jitsiApiRef.current = null;
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.action === "left-meeting") {
+        setMeetingEnded(true);
       }
-      // Remove the script tag if still present
-      const existing = document.querySelector('script[src="https://meet.jit.si/external_api.js"]');
-      if (existing) existing.remove();
     };
-  }, [state, meeting]);
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  // Transition to done when call ends
+  useEffect(() => {
+    if (meetingEnded) setState("done");
+  }, [meetingEnded]);
 
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (state === "loading") {
@@ -197,8 +142,13 @@ export default function MeetingPage() {
         )}
       </header>
 
-      {/* Jitsi iframe container — fills remaining viewport */}
-      <div ref={jitsiContainerRef} className="flex-1 w-full" style={{ minHeight: 0 }} />
+      {/* Daily.co iframe — fills remaining viewport */}
+      <iframe
+        src={meeting!.meeting_link!}
+        allow="camera; microphone; fullscreen; speaker; display-capture"
+        style={{ width: "100%", flex: 1, border: "none", minHeight: 0 }}
+        title="WAK Solutions Meeting"
+      />
     </div>
   );
 }
