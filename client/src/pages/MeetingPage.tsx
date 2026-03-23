@@ -84,11 +84,22 @@ export default function MeetingPage() {
           prejoinPageEnabled: false,
           startWithAudioMuted: false,
           startWithVideoMuted: false,
+          disableThirdPartyRequests: true,
+          hideConferenceTimer: false,
+          hideConferenceSubject: true,
+          subject: 'WAK Solutions Meeting',
         },
         interfaceConfigOverwrite: {
           SHOW_JITSI_WATERMARK: false,
           SHOW_WATERMARK_FOR_GUESTS: false,
           SHOW_BRAND_WATERMARK: false,
+          BRAND_WATERMARK_LINK: '',
+          SHOW_POWERED_BY: false,
+          SHOW_PROMOTIONAL_CLOSE_PAGE: false,
+          DISPLAY_WELCOME_PAGE_CONTENT: false,
+          DISPLAY_WELCOME_PAGE_TOOLBAR_ADDITIONAL_CONTENT: false,
+          SHOW_CHROME_EXTENSION_BANNER: false,
+          MOBILE_APP_PROMO: false,
         },
       });
 
