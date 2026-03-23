@@ -11,16 +11,21 @@ import Statistics from "./pages/statistics";
 import ChatbotConfig from "./pages/ChatbotConfig";
 import Meetings from "./pages/Meetings";
 import BookMeeting from "./pages/BookMeeting";
+import SurveyPage from "./pages/SurveyPage";
+import SurveysTab from "./pages/SurveysTab";
 
 function Router() {
   return (
     <Switch>
+      {/* Public routes — must come before any auth-guarded routes */}
+      <Route path="/survey/:token" component={SurveyPage} />
+      <Route path="/book/:token" component={BookMeeting} />
       <Route path="/login" component={Login} />
       <Route path="/guide" component={Guide} />
       <Route path="/statistics" component={Statistics} />
       <Route path="/chatbot-config" component={ChatbotConfig} />
       <Route path="/meetings" component={Meetings} />
-      <Route path="/book/:token" component={BookMeeting} />
+      <Route path="/surveys" component={SurveysTab} />
       <Route path="/" component={Dashboard} />
       <Route component={NotFound} />
     </Switch>

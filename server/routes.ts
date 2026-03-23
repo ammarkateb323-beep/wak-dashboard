@@ -6,6 +6,7 @@ import { pool } from "./db";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { notifyManagerNewBooking } from "./email";
+import { ensureSurveyTables, registerSurveyRoutes, sendSurveyToCustomer } from "./surveys";
 import webpush from "web-push";
 import {
   generateRegistrationOptions,
@@ -246,6 +247,9 @@ export async function registerRoutes(
           body: JSON.stringify({ customer_phone })
         }).catch(e => console.error("Error calling n8n close webhook", e));
       }
+
+      // Send post-chat survey (fire-and-forget)
+      sendSurveyToCustomer(customer_phone, null, customer_phone);
 
       res.json({ success: true });
     } catch (err: any) {
@@ -521,7 +525,12 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
         [req.params.id]
       );
       if (result.rows.length === 0) return res.status(404).json({ message: 'Meeting not found' });
-      res.json(result.rows[0]);
+      const meeting = result.rows[0];
+
+      // Send post-chat survey (fire-and-forget)
+      sendSurveyToCustomer(meeting.customer_phone, meeting.agent ?? null, null);
+
+      res.json(meeting);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -781,6 +790,10 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
     pushSubscriptions.delete(subscription.endpoint);
     res.json({ success: true });
   });
+
+  // ── Survey Routes ─────────────────────────────────────────────────────────
+  await ensureSurveyTables();
+  registerSurveyRoutes(app, requireAuth);
 
   return httpServer;
 }

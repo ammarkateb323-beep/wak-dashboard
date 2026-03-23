@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation, Link } from "wouter";
-import { ArrowLeft, Users, RefreshCw, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowLeft, Users, RefreshCw, Sparkles, AlertCircle, ClipboardList } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -90,6 +90,21 @@ export default function Statistics() {
 
   const { data: stats, isLoading: isStatsLoading } = useStatistics(fromISO, toISO);
   const { mutate: generateSummary, data: summaryData, isPending: isSummaryLoading, error: summaryError, reset: resetSummary } = useAiSummary();
+
+  const [surveyOverview, setSurveyOverview] = useState<{
+    activeSurvey: { id: number; title: string } | null;
+    weekResponses: number;
+    weekSubmitted: number;
+    weekAvgRating: number | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetch("/api/surveys/overview", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => d && setSurveyOverview(d))
+      .catch(() => {});
+  }, [isAuthenticated]);
 
   // Auto-generate summary when date range changes (only if a summary was already shown)
   const hasSummary = !!summaryData;
@@ -307,6 +322,57 @@ export default function Statistics() {
               <p className="text-sm text-muted-foreground text-center">
                 Click "Generate Summary" to get an AI-powered analysis of conversations in this period.
               </p>
+            )}
+          </div>
+        </section>
+
+        {/* ── Section 3: Survey Overview ── */}
+        <section className="space-y-4 pb-8">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-[#0F510F]" />
+            <h2 className="text-base font-semibold text-foreground">Survey Overview</h2>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+            {surveyOverview === null ? (
+              <div className="h-16 flex items-center justify-center">
+                <div className="w-5 h-5 border-4 border-[#0F510F]/20 border-t-[#0F510F] rounded-full animate-spin" />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Active Survey</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {surveyOverview.activeSurvey ? surveyOverview.activeSurvey.title : "No active survey"}
+                    </p>
+                  </div>
+                  {surveyOverview.activeSurvey && (
+                    <Link href="/surveys">
+                      <a className="text-xs text-[#0F510F] hover:underline font-medium">View full results →</a>
+                    </Link>
+                  )}
+                </div>
+
+                {surveyOverview.activeSurvey && (
+                  <div className="grid grid-cols-3 gap-3 pt-1 border-t border-border">
+                    <div className="text-center">
+                      <p className="text-xl font-bold text-foreground">{surveyOverview.weekResponses}</p>
+                      <p className="text-xs text-muted-foreground">Sent this week</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xl font-bold text-foreground">{surveyOverview.weekSubmitted}</p>
+                      <p className="text-xs text-muted-foreground">Submitted</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xl font-bold text-foreground">
+                        {surveyOverview.weekAvgRating !== null ? surveyOverview.weekAvgRating : "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Avg rating</p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>
