@@ -577,9 +577,11 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
     try {
       const weekStart = (req.query.weekStart as string) || new Date().toISOString().slice(0, 10);
       const KSA_MS = 3 * 60 * 60 * 1000;
-      // weekStart is a KSA date — convert to UTC boundaries for the query
+      // weekStart is the UTC-date string of KSA local midnight on day 0 of the week
+      // (e.g. "2026-03-22" = Mon 23 Mar 00:00 KSA = 22 Mar 21:00 UTC).
+      // Derive the UTC boundaries: day 0 KSA midnight = Date.UTC(yr, mo-1, dy+1) - KSA_MS
       const [yr, mo, dy] = weekStart.split('-').map(Number);
-      const weekStartUtc = new Date(Date.UTC(yr, mo - 1, dy, 0, 0, 0) - KSA_MS);
+      const weekStartUtc = new Date(Date.UTC(yr, mo - 1, dy + 1, 0, 0, 0) - KSA_MS);
       const weekEndUtc   = new Date(weekStartUtc.getTime() + 7 * 24 * 60 * 60 * 1000);
       const result = await pool.query(
         `SELECT scheduled_at FROM meetings
@@ -590,7 +592,10 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
       );
       const rows = result.rows.map((r: { scheduled_at: Date }) => {
         const ksa = new Date(new Date(r.scheduled_at).getTime() + KSA_MS);
-        const date = ksa.toISOString().slice(0, 10);
+        // Return the UTC date of KSA local midnight — this matches the key convention
+        // used by the frontend's toDateStr() (toISOString().slice(0,10) on a local-midnight Date).
+        const ksaMidnightUtc = new Date(Date.UTC(ksa.getUTCFullYear(), ksa.getUTCMonth(), ksa.getUTCDate()) - KSA_MS);
+        const date = ksaMidnightUtc.toISOString().slice(0, 10);
         const time = `${String(ksa.getUTCHours()).padStart(2, '0')}:00`;
         return { date, time };
       });
