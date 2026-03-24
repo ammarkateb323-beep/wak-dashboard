@@ -100,7 +100,7 @@ export async function sendSurveyToCustomer(
       process.env.APP_URL ||
       process.env.RAILWAY_PUBLIC_URL ||
       process.env.RAILWAY_PUBLIC_DOMAIN ||
-      'wak-solutions.com'
+      'wak-agents.up.railway.app'
     ).replace(/\/$/, '');
     const baseUrl = rawBase.startsWith('http') ? rawBase : `https://${rawBase}`;
     const surveyLink = `${baseUrl}/survey/${token}`;

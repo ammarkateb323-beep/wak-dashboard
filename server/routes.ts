@@ -973,7 +973,7 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
         process.env.APP_URL ||
         process.env.RAILWAY_PUBLIC_URL ||
         process.env.RAILWAY_PUBLIC_DOMAIN ||
-        'wak-solutions.com'
+        'wak-agents.up.railway.app'
       ).replace(/\/$/, '');
       const baseUrl = rawBase.startsWith('http') ? rawBase : `https://${rawBase}`;
       const brandedLink = `${baseUrl}/meeting/${meeting.meeting_token}`;
