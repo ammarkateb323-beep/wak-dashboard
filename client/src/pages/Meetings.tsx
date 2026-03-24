@@ -156,8 +156,9 @@ export default function Meetings() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to start meeting");
+      const updated = await res.json();
       setMeetings((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, status: "in_progress" } : m))
+        prev.map((m) => (m.id === id ? { ...m, status: "in_progress", agent_name: updated.agent_name ?? m.agent_name } : m))
       );
     } catch (e: any) {
       setError(e.message);

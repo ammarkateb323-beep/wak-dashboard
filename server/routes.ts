@@ -695,9 +695,11 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
 
   app.patch('/api/meetings/:id/start', requireAuth, async (req, res) => {
     try {
+      const agentId = req.session.agentId ?? null;
       const result = await pool.query(
-        `UPDATE meetings SET status = 'in_progress' WHERE id = $1 RETURNING *`,
-        [req.params.id]
+        `UPDATE meetings SET status = 'in_progress', agent_id = $2 WHERE id = $1
+         RETURNING meetings.*, (SELECT name FROM agents WHERE id = $2) AS agent_name`,
+        [req.params.id, agentId]
       );
       if (result.rows.length === 0) return res.status(404).json({ message: 'Meeting not found' });
       res.json(result.rows[0]);
