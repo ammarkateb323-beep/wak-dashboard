@@ -3,7 +3,7 @@ import { useLocation, Link } from "wouter";
 import { ArrowLeft, Video, ExternalLink, CheckCircle2, Clock, Filter, CalendarDays, ChevronLeft, ChevronRight, Ban } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
-type MeetingStatus = "pending" | "completed";
+type MeetingStatus = "pending" | "in_progress" | "completed";
 type FilterType = "all" | "upcoming" | "completed";
 
 interface Meeting {
@@ -63,6 +63,7 @@ export default function Meetings() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState<number | null>(null);
+  const [starting, setStarting] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Availability state
@@ -146,6 +147,24 @@ export default function Meetings() {
   useEffect(() => {
     if (isAuthenticated) fetchMeetings();
   }, [isAuthenticated, fetchMeetings]);
+
+  const startMeeting = async (id: number) => {
+    setStarting(id);
+    try {
+      const res = await fetch(`/api/meetings/${id}/start`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to start meeting");
+      setMeetings((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, status: "in_progress" } : m))
+      );
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setStarting(null);
+    }
+  };
 
   const markComplete = async (id: number) => {
     if (!window.confirm("Mark this meeting as done and send the customer a survey?")) return;
@@ -303,15 +322,19 @@ export default function Meetings() {
                           <span className="text-muted-foreground italic">Not booked yet</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">
-                        {m.agent_name ?? <span className="italic">—</span>}
+                      <td className="px-4 py-3 text-xs">
+                        {m.agent_name
+                          ? <span className="text-foreground">{m.agent_name}</span>
+                          : <span className="text-muted-foreground italic">Unassigned</span>}
                       </td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                             m.status === "completed"
                               ? "bg-[#0F510F]/10 text-[#0F510F]"
-                              : "bg-amber-100 text-amber-700"
+                              : m.status === "in_progress"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-muted text-muted-foreground"
                           }`}
                         >
                           {m.status === "completed" ? (
@@ -319,11 +342,27 @@ export default function Meetings() {
                           ) : (
                             <Clock className="w-3 h-3" />
                           )}
-                          {m.status === "completed" ? "Completed" : "Pending"}
+                          {m.status === "completed" ? "Completed"
+                            : m.status === "in_progress" ? "In Progress"
+                            : "Pending"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         {m.status === "pending" && (
+                          <button
+                            onClick={() => startMeeting(m.id)}
+                            disabled={starting === m.id}
+                            className="flex items-center gap-1 text-xs font-medium text-amber-700 border border-amber-300 px-3 py-1 rounded-lg hover:bg-amber-50 disabled:opacity-50 transition-colors whitespace-nowrap"
+                          >
+                            {starting === m.id ? (
+                              <div className="w-3 h-3 border-2 border-amber-300 border-t-amber-700 rounded-full animate-spin" />
+                            ) : (
+                              <Clock className="w-3.5 h-3.5" />
+                            )}
+                            Start
+                          </button>
+                        )}
+                        {m.status === "in_progress" && (
                           <button
                             onClick={() => markComplete(m.id)}
                             disabled={completing === m.id}

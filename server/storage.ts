@@ -8,7 +8,7 @@ import {
   type InsertEscalation,
   type Conversation
 } from "@shared/schema";
-import { eq, desc, asc, sql } from "drizzle-orm";
+import { eq, desc, asc, sql, inArray } from "drizzle-orm";
 
 export interface StatsPerDay {
   date: string;   // 'YYYY-MM-DD'
@@ -45,7 +45,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOpenEscalations(): Promise<Escalation[]> {
-    return await db.select().from(escalations).where(eq(escalations.status, 'open')).orderBy(desc(escalations.created_at));
+    return await db.select().from(escalations)
+      .where(inArray(escalations.status, ['open', 'in_progress']))
+      .orderBy(desc(escalations.created_at));
   }
 
   async getEscalation(phone: string): Promise<Escalation | undefined> {

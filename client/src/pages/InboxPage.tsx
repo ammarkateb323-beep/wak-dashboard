@@ -19,6 +19,24 @@ function timeAgo(iso: string): string {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
+function statusBadge(status: string) {
+  if (status === "in_progress") return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+      <Clock className="w-2.5 h-2.5" />In Progress
+    </span>
+  );
+  if (status === "closed" || status === "resolved") return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-[#0F510F]/10 text-[#0F510F]">
+      Resolved
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+      Open
+    </span>
+  );
+}
+
 function ChatCard({
   row,
   showAgent,
@@ -34,17 +52,20 @@ function ChatCard({
         <User className="w-4 h-4 text-[#0F510F]" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground font-mono">{row.customer_phone}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-foreground font-mono">{row.customer_phone}</p>
+          {statusBadge(row.status)}
+        </div>
         {row.escalation_reason && (
           <p className="text-xs text-muted-foreground truncate">{row.escalation_reason}</p>
         )}
         <div className="flex items-center gap-2 mt-0.5">
           <Clock className="w-3 h-3 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">{timeAgo(row.created_at)}</span>
-          {showAgent && row.assigned_agent_name && (
-            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
-              {row.assigned_agent_name}
-            </span>
+          {showAgent && (
+            row.assigned_agent_name
+              ? <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">{row.assigned_agent_name}</span>
+              : <span className="text-xs text-muted-foreground italic">Unassigned</span>
           )}
         </div>
       </div>

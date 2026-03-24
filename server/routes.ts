@@ -404,7 +404,7 @@ export async function registerRoutes(
         return res.status(409).json({ message: 'This chat is already assigned to another agent.' });
       }
       await pool.query(
-        `UPDATE escalations SET assigned_agent_id=$1 WHERE customer_phone=$2`,
+        `UPDATE escalations SET assigned_agent_id=$1, status='in_progress' WHERE customer_phone=$2`,
         [agentId, phone]
       );
       res.json({ success: true });
@@ -677,7 +677,7 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
     try {
       const filter = (req.query.filter as string) || 'all';
       let where = '';
-      if (filter === 'upcoming') where = "WHERE status = 'pending'";
+      if (filter === 'upcoming') where = "WHERE status IN ('pending', 'in_progress')";
       else if (filter === 'completed') where = "WHERE status = 'completed'";
       const result = await pool.query(
         `SELECT m.id, m.customer_phone, m.agent_id, a.name AS agent_name,
@@ -688,6 +688,19 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
          ${where} ORDER BY m.created_at DESC`
       );
       res.json(result.rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch('/api/meetings/:id/start', requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `UPDATE meetings SET status = 'in_progress' WHERE id = $1 RETURNING *`,
+        [req.params.id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ message: 'Meeting not found' });
+      res.json(result.rows[0]);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
