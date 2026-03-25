@@ -266,7 +266,9 @@ export default function AgentsTab() {
                     <th className="text-left px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-28">Role / Status</th>
                     <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-20">
                       <span className="block">Chats Resolved</span>
-                      <span className="block normal-case font-normal text-muted-foreground/60">{PERIODS.find(p => p.key === period)!.sub}</span>
+                      {period !== "all" && (
+                        <span className="block normal-case font-normal text-muted-foreground/60">{PERIODS.find(p => p.key === period)!.sub}</span>
+                      )}
                     </th>
                     <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-20">Meetings</th>
                     <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-16">Rating</th>

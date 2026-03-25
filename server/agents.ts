@@ -83,7 +83,7 @@ export function registerAgentRoutes(app: any, requireAdmin: any): void {
         SELECT
           a.id, a.name, a.email, a.role, a.is_active, a.last_login,
           COUNT(e.customer_phone) FILTER (
-            WHERE e.status = 'resolved' ${dateFilter}
+            WHERE e.status = 'closed' ${dateFilter}
           )::int AS resolved_chats,
           (SELECT COUNT(*)::int FROM meetings m
            WHERE m.agent_id = a.id AND m.status = 'completed') AS meetings_completed,
