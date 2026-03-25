@@ -232,16 +232,16 @@ export default function AgentsTab() {
                 <div className="w-6 h-6 border-4 border-[#0F510F]/20 border-t-[#0F510F] rounded-full animate-spin" />
               </div>
             ) : (
-              <table className="w-full text-sm table-fixed">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[30%]">Agent</th>
-                    <th className="text-left px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[18%]">Role / Status</th>
-                    <th className="text-center px-1 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[10%]">Chats</th>
-                    <th className="text-center px-1 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[12%]">Meetings</th>
-                    <th className="text-center px-1 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[11%]">Rating</th>
-                    <th className="hidden md:table-cell text-left px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[14%]">Last Login</th>
-                    <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agent</th>
+                    <th className="text-left px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-28">Role / Status</th>
+                    <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-14">Chats</th>
+                    <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-20">Meetings</th>
+                    <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-16">Rating</th>
+                    <th className="hidden md:table-cell text-left px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-28">Last Login</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-24 xl:w-32">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -293,13 +293,13 @@ export default function AgentsTab() {
                           ? new Date(agent.last_login).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
                           : "Never"}
                       </td>
-                      {/* Actions: labels on xl+, icons only on smaller */}
-                      <td className="px-3 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                      {/* Actions: icon-only on <xl, stacked with labels on xl+ */}
+                      <td className="px-3 py-3">
+                        <div className="flex items-center justify-end gap-1 xl:flex-col xl:items-end xl:gap-0.5">
                           <button
                             onClick={() => { setEditForm({ name: agent.name, email: agent.email, role: agent.role }); setEditAgent(agent); setEditError(""); }}
                             title="Edit"
-                            className="flex items-center gap-1 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            className="flex items-center gap-1 px-1.5 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                           >
                             <Edit2 className="w-3.5 h-3.5 flex-shrink-0" />
                             <span className="hidden xl:inline text-xs">Edit</span>
@@ -307,7 +307,7 @@ export default function AgentsTab() {
                           <button
                             onClick={() => { setResetAgent(agent); setNewPw(""); setResetError(""); }}
                             title="Reset password"
-                            className="flex items-center gap-1 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            className="flex items-center gap-1 px-1.5 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                           >
                             <KeyRound className="w-3.5 h-3.5 flex-shrink-0" />
                             <span className="hidden xl:inline text-xs">Reset</span>
@@ -315,7 +315,7 @@ export default function AgentsTab() {
                           <button
                             onClick={() => toggleActive(agent)}
                             title={agent.is_active ? "Deactivate" : "Activate"}
-                            className={`flex items-center gap-1 p-1.5 rounded-lg transition-colors ${agent.is_active ? "text-red-500 hover:bg-red-50" : "text-green-600 hover:bg-green-50"}`}
+                            className={`flex items-center gap-1 px-1.5 py-1 rounded-lg transition-colors ${agent.is_active ? "text-red-500 hover:bg-red-50" : "text-green-600 hover:bg-green-50"}`}
                           >
                             {agent.is_active ? <UserX className="w-3.5 h-3.5 flex-shrink-0" /> : <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />}
                             <span className="hidden xl:inline text-xs">{agent.is_active ? "Deactivate" : "Activate"}</span>
