@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
-import { LogOut, Wifi, WifiOff, Fingerprint, Bell, Share, X, BookOpen, BarChart2, Bot, Video, ClipboardList, Inbox, Users } from "lucide-react";
+import { LogOut, Wifi, WifiOff, Fingerprint, Bell, Share, X, BookOpen, BarChart2, Bot, Video, ClipboardList, Inbox, Users, Menu } from "lucide-react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { useAuth, useLogout } from "@/hooks/use-auth";
 import { useConversations } from "@/hooks/use-conversations";
@@ -9,12 +9,13 @@ import { Sidebar } from "@/components/sidebar";
 import { ChatArea } from "@/components/chat-area";
 
 export default function Dashboard() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { isAuthenticated, isLoading: isAuthLoading, isAdmin } = useAuth();
   const { mutate: logout } = useLogout();
   const { data: conversations = [], isLoading: isEscalationsLoading, isFetching } = useConversations();
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   const [connected, setConnected] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const { showBanner, showInstallPrompt, enableNotifications, dismissInstallPrompt } = usePushNotifications(isAuthenticated);
 
@@ -87,8 +88,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Status + Logout */}
-        <div className="flex items-center gap-4">
+        {/* Right side: status + nav + logout/hamburger */}
+        <div className="flex items-center gap-2">
+          {/* Connection status — always visible */}
           <div
             data-testid="status-connection"
             className="flex items-center gap-1.5 text-xs"
@@ -108,76 +110,143 @@ export default function Dashboard() {
             )}
           </div>
 
-          <Link href="/inbox">
-            <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-              <Inbox className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Inbox</span>
-            </a>
-          </Link>
-
-          {isAdmin && (
-            <Link href="/agents">
+          {/* Nav links — desktop only */}
+          <div className="hidden md:flex items-center gap-1">
+            <Link href="/inbox">
               <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-                <Users className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Agents</span>
+                <Inbox className="w-3.5 h-3.5" /><span>Inbox</span>
               </a>
             </Link>
-          )}
+            {isAdmin && (
+              <Link href="/agents">
+                <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
+                  <Users className="w-3.5 h-3.5" /><span>Agents</span>
+                </a>
+              </Link>
+            )}
+            <Link href="/statistics">
+              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
+                <BarChart2 className="w-3.5 h-3.5" /><span>Statistics</span>
+              </a>
+            </Link>
+            <Link href="/meetings">
+              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
+                <Video className="w-3.5 h-3.5" /><span>Meetings</span>
+              </a>
+            </Link>
+            <Link href="/chatbot-config">
+              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
+                <Bot className="w-3.5 h-3.5" /><span>Chatbot Config</span>
+              </a>
+            </Link>
+            <Link href="/surveys">
+              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
+                <ClipboardList className="w-3.5 h-3.5" /><span>Surveys</span>
+              </a>
+            </Link>
+            <Link href="/guide">
+              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
+                <BookOpen className="w-3.5 h-3.5" /><span>Guide</span>
+              </a>
+            </Link>
+            <button
+              onClick={handleRegisterBiometric}
+              title="Set up Face ID / Fingerprint login"
+              className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10"
+            >
+              <Fingerprint className="w-3.5 h-3.5" /><span>Biometric</span>
+            </button>
+          </div>
 
-          <Link href="/statistics">
-            <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-              <BarChart2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Statistics</span>
-            </a>
-          </Link>
-
-          <Link href="/meetings">
-            <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-              <Video className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Meetings</span>
-            </a>
-          </Link>
-
-          <Link href="/chatbot-config">
-            <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-              <Bot className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Chatbot Config</span>
-            </a>
-          </Link>
-
-          <Link href="/surveys">
-            <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-              <ClipboardList className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Surveys</span>
-            </a>
-          </Link>
-
-          <Link href="/guide">
-            <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-              <BookOpen className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Guide</span>
-            </a>
-          </Link>
-
-          <button
-            onClick={handleRegisterBiometric}
-            title="Set up Face ID / Fingerprint login"
-            className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10"
-          >
-            <Fingerprint className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Biometric</span>
-          </button>
-
+          {/* Logout — always visible */}
           <button
             data-testid="button-logout"
             onClick={handleLogout}
             className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Logout</span>
+            <span className="hidden md:inline">Logout</span>
+          </button>
+
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="md:hidden flex items-center justify-center p-2 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
           </button>
         </div>
       </header>
+
+      {/* Mobile nav menu overlay */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 z-50 md:hidden"
+          onClick={() => setMenuOpen(false)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40" />
+
+          {/* Drawer — slides in from the right */}
+          <div
+            className="absolute top-0 right-0 h-full w-72 bg-white shadow-xl flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Drawer header */}
+            <div className="h-14 bg-[#0F510F] flex items-center justify-between px-5">
+              <span className="text-white font-semibold text-sm">Menu</span>
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="text-white/70 hover:text-white p-1 rounded transition-colors"
+                aria-label="Close menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Nav items */}
+            <nav className="flex-1 overflow-y-auto py-2">
+              {(
+                [
+                  { href: "/inbox",         icon: <Inbox className="w-5 h-5" />,        label: "Inbox" },
+                  ...(isAdmin ? [{ href: "/agents", icon: <Users className="w-5 h-5" />, label: "Agents" }] : []),
+                  { href: "/statistics",    icon: <BarChart2 className="w-5 h-5" />,     label: "Statistics" },
+                  { href: "/meetings",      icon: <Video className="w-5 h-5" />,          label: "Meetings" },
+                  { href: "/chatbot-config",icon: <Bot className="w-5 h-5" />,            label: "Chatbot Config" },
+                  { href: "/surveys",       icon: <ClipboardList className="w-5 h-5" />,  label: "Surveys" },
+                  { href: "/guide",         icon: <BookOpen className="w-5 h-5" />,       label: "Guide" },
+                ] as { href: string; icon: React.ReactNode; label: string }[]
+              ).map(item => (
+                <Link key={item.href} href={item.href}>
+                  <a
+                    onClick={() => setMenuOpen(false)}
+                    className={`flex items-center gap-4 px-5 py-3.5 text-sm font-medium transition-colors min-h-[48px] ${
+                      location === item.href
+                        ? "bg-[#0F510F]/10 text-[#0F510F] border-l-4 border-[#0F510F]"
+                        : "text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <span className={location === item.href ? "text-[#0F510F]" : "text-muted-foreground"}>
+                      {item.icon}
+                    </span>
+                    {item.label}
+                  </a>
+                </Link>
+              ))}
+
+              {/* Biometric button */}
+              <button
+                onClick={() => { handleRegisterBiometric(); setMenuOpen(false); }}
+                className="w-full flex items-center gap-4 px-5 py-3.5 text-sm font-medium text-foreground hover:bg-muted transition-colors min-h-[48px]"
+              >
+                <span className="text-muted-foreground"><Fingerprint className="w-5 h-5" /></span>
+                Biometric Setup
+              </button>
+            </nav>
+          </div>
+        </div>
+      )}
 
       {/* iOS PWA Install Prompt */}
       {showInstallPrompt && (
