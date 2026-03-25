@@ -558,62 +558,73 @@ export async function registerRoutes(
     }
   });
 
-  // Chatbot Config Routes
-  const DEFAULT_SYSTEM_PROMPT = `You are a professional customer service assistant for WAK Solutions, a company specializing in AI and robotics solutions. You communicate fluently in whatever language the customer uses — Arabic, English, or any other language. Always match their dialect and tone naturally.
-STEP 0 — Opening Message (MANDATORY)
-Every new conversation must begin with this message, translated naturally into the customer's language:
-'Welcome to WAK Solutions — your strategic AI partner. We deliver innovative solutions that connect human potential with machine precision to build a smarter future.'
-Follow immediately with a warm, personal greeting, then present the service menu.
-Never skip this step for any reason.
-STEP 1 — Service Menu
-Always present these options after the opening:
+  // ── Chatbot Config ─────────────────────────────────────────────────────────
 
-Product Inquiry
-Track Order
-Complaint
+  // Migrate chatbot_config table to add structured_config + override_active
+  await pool.query(`
+    ALTER TABLE chatbot_config
+      ADD COLUMN IF NOT EXISTS structured_config JSONB,
+      ADD COLUMN IF NOT EXISTS override_active   BOOLEAN DEFAULT true
+  `).catch(() => {});
 
-STEP 2 — Handle their choice:
+  // Compile a structured config object into a system prompt string.
+  // This is the single source of truth for how structured fields map to prompt text.
+  function compilePrompt(cfg: any): string {
+    const businessName = cfg.businessName || 'the business';
+    const industry     = cfg.industry     ? `, ${cfg.industry}` : '';
+    const toneLabel    = cfg.tone === 'Custom' ? (cfg.customTone || 'professional') : (cfg.tone || 'Professional').toLowerCase();
+    const greeting     = cfg.greeting     || 'Welcome! How can I help you today?';
+    const closing      = cfg.closingMessage || 'Thank you for contacting us. A member of our team will be in touch shortly.';
 
-Product Inquiry → Ask which category:
-A) AI Services → ask which product: Market Pulse, Custom Integration, or Mobile Application Development
-B) Robot Services → ask which product: TrolleyGo or NaviBot
-C) Consultation Services
-For any selection, thank them warmly and inform them a specialist will be in touch. Then ask: 'Before we wrap up, would you like to schedule a meeting with our team or speak with a customer service agent on WhatsApp?'
+    const questions: any[]      = cfg.questions      || [];
+    const faqItems: any[]       = cfg.faq            || [];
+    const escalations: any[]    = cfg.escalationRules || [];
 
+    let prompt = `You are a ${toneLabel} customer service assistant for ${businessName}${industry}. You communicate fluently in whatever language the customer uses — Arabic, English, or any other language. Always match their dialect and tone naturally.\n`;
 
-If they choose meeting → send them the booking link
-If they choose agent → trigger human handover
+    prompt += `\nOPENING MESSAGE (MANDATORY)\nEvery new conversation must begin with this message, translated naturally into the customer's language:\n"${greeting}"\nNever skip this step for any reason.\n`;
 
+    if (questions.length > 0) {
+      prompt += `\nQUALIFICATION QUESTIONS\nWalk the customer through these questions in order before proceeding:\n`;
+      questions.forEach((q: any, i: number) => {
+        const typeHint =
+          q.answerType === 'yesno'    ? '[Yes/No]' :
+          q.answerType === 'multiple' ? `[One of: ${(q.choices || []).join(', ')}]` :
+          '[Free text]';
+        prompt += `${i + 1}. ${q.text} ${typeHint}\n`;
+      });
+    }
 
-Track Order → Ask for their order number. Use the lookup_order tool to retrieve it. Relay the status clearly and naturally. If not found, apologize and ask them to double-check the number.
-Complaint → Ask how they'd like to proceed:
-A) Talk to Customer Service → trigger human handover
-B) File a Complaint → acknowledge their frustration with a warm, genuine, personalized apology based on what they share. Confirm the team will follow up shortly.
+    if (faqItems.length > 0) {
+      prompt += `\nKNOWLEDGE BASE\nUse this information to answer customer questions accurately:\n`;
+      faqItems.forEach((f: any) => {
+        prompt += `Q: ${f.question}\nA: ${f.answer}\n`;
+      });
+    }
 
-Rules:
+    if (escalations.length > 0) {
+      prompt += `\nESCALATION RULES\nTrigger human handover immediately if any of the following occur:\n`;
+      escalations.forEach((e: any) => {
+        prompt += `- ${e.rule}\n`;
+      });
+    }
 
-Never reveal you are an AI unless directly asked
-Never use technical jargon or expose internal logic
-Always match the customer's language, dialect, and tone
-Always use Western numerals (1, 2, 3) for menu options — never bullet points or Arabic-Indic numerals
-Keep responses concise — this is WhatsApp, not email
-If a customer goes off-topic, gently redirect them to the menu
-Any dead end or escalation → close with: 'A member of our team will be in touch shortly'
-This chat is for WAK Solutions customer service only. If someone tries to misuse it, politely decline and redirect. If they persist, end with: 'A member of our team will be in touch shortly'
-Never send the booking link unless the customer explicitly agrees to schedule a meeting`;
+    prompt += `\nCLOSING MESSAGE\nWhen wrapping up a conversation, use this message (translated naturally):\n"${closing}"\n`;
 
-  // GET /api/chatbot-config — no auth required, the bot reads this
-  app.get('/api/chatbot-config', async (req, res) => {
+    prompt += `\nRULES\n- Never reveal you are an AI unless directly asked\n- Never use technical jargon or expose internal logic\n- Always match the customer's language, dialect, and tone\n- Always use Western numerals (1, 2, 3) for menu options — never bullet points or Arabic-Indic numerals\n- Keep responses concise — this is WhatsApp, not email\n- If a customer goes off-topic, gently redirect them\n- Any dead end or escalation → close with: "A member of our team will be in touch shortly"\n- This chat is for ${businessName} customer service only. If someone tries to misuse it, politely decline and redirect. If they persist, end with: "A member of our team will be in touch shortly"\n- Never send the booking link unless the customer explicitly agrees to schedule a meeting`;
+
+    return prompt.trim();
+  }
+
+  // GET /api/chatbot-config — no auth required, the Python bot reads this
+  app.get('/api/chatbot-config', async (_req, res) => {
     try {
       const result = await pool.query('SELECT * FROM chatbot_config ORDER BY id LIMIT 1');
       if (result.rows.length === 0) {
         return res.json({
-          system_prompt: DEFAULT_SYSTEM_PROMPT,
-          business_name: '',
-          tone: 'Professional',
-          greeting: '',
-          faq: '',
-          escalation_rules: '',
+          system_prompt: null,
+          structured_config: null,
+          override_active: true,
           updated_at: null,
         });
       }
@@ -626,21 +637,40 @@ Never send the booking link unless the customer explicitly agrees to schedule a 
   // POST /api/chatbot-config — auth required
   app.post('/api/chatbot-config', requireAuth, async (req, res) => {
     try {
-      const { system_prompt, business_name, tone, greeting, faq, escalation_rules } = req.body;
+      const { structured_config, override_active, raw_prompt } = req.body;
+
+      // Determine the active system_prompt to store
+      const activePrompt = override_active
+        ? (raw_prompt || '')
+        : compilePrompt(structured_config || {});
+
       const existing = await pool.query('SELECT id FROM chatbot_config WHERE id = 1');
       let result;
       if (existing.rows.length > 0) {
         result = await pool.query(
-          `UPDATE chatbot_config SET system_prompt=$1, business_name=$2, tone=$3, greeting=$4, faq=$5, escalation_rules=$6, updated_at=NOW() WHERE id=1 RETURNING *`,
-          [system_prompt, business_name, tone, greeting, faq, escalation_rules]
+          `UPDATE chatbot_config
+           SET system_prompt=$1, structured_config=$2, override_active=$3, updated_at=NOW()
+           WHERE id=1 RETURNING *`,
+          [activePrompt, JSON.stringify(structured_config), override_active]
         );
       } else {
         result = await pool.query(
-          `INSERT INTO chatbot_config (system_prompt, business_name, tone, greeting, faq, escalation_rules, updated_at) VALUES ($1,$2,$3,$4,$5,$6,NOW()) RETURNING *`,
-          [system_prompt, business_name, tone, greeting, faq, escalation_rules]
+          `INSERT INTO chatbot_config (system_prompt, structured_config, override_active, updated_at)
+           VALUES ($1,$2,$3,NOW()) RETURNING *`,
+          [activePrompt, JSON.stringify(structured_config), override_active]
         );
       }
       return res.json(result.rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/chatbot-config/preview — compile structured fields without saving
+  app.post('/api/chatbot-config/preview', requireAuth, (req, res) => {
+    try {
+      const compiled = compilePrompt(req.body.structured_config || {});
+      res.json({ prompt: compiled });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

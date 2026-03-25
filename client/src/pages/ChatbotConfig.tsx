@@ -1,114 +1,411 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, Link } from "wouter";
-import { ArrowLeft, Bot, Save, RotateCcw, Wand2 } from "lucide-react";
+import {
+  ArrowLeft, Bot, Save, RotateCcw, ChevronDown, ChevronUp,
+  Plus, Trash2, GripVertical, AlertTriangle, Eye, EyeOff,
+} from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 
-const DEFAULT_SYSTEM_PROMPT = `You are a professional customer service assistant for WAK Solutions, a company specializing in AI and robotics solutions. You communicate in whatever language the customer uses - Arabic, English, Chinese, or any other language.
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-STEP 0 - Opening Message
-This step is mandatory and must always be sent as the first message in every new conversation, without exception. Do not skip it for any reason.
-Always begin every new conversation with this message, translated naturally into the customer's language:
-"Welcome to WAK Solutions - your strategic AI partner. We deliver innovative solutions that connect human potential with machine precision to build a smarter future."
-Follow it immediately with a warm personal greeting, then present the service menu.
+type AnswerType = "free" | "yesno" | "multiple";
 
-STEP 1 - Service Menu
-After the opening, always present these options:
-1. Product Inquiry
-2. Track Order
-3. Complaint
+interface Question {
+  id: string;
+  text: string;
+  answerType: AnswerType;
+  choices: string[];
+}
 
-STEP 2 - Based on their choice:
+interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
 
-1. Product Inquiry -> Ask which category:
-   A) AI Services -> then ask which product: Market Pulse, Custom Integration, or Mobile Application Development
-   B) Robot Services -> then ask which product: TrolleyGo or NaviBot
-   C) Consultation Services
-   For any product or consultation selection, thank them warmly and let them know a specialist will be in touch. End the conversation politely.
+interface EscalationRule {
+  id: string;
+  rule: string;
+}
 
-2. Track Order -> Ask them to share their order number. Use the lookup_order tool to look up the order by order_number. Relay the status and details naturally and clearly. If no order is found, apologize and suggest they double-check the number.
+interface StructuredConfig {
+  businessName: string;
+  industry: string;
+  tone: string;
+  customTone: string;
+  greeting: string;
+  questions: Question[];
+  faq: FaqItem[];
+  escalationRules: EscalationRule[];
+  closingMessage: string;
+}
 
-3. Complaint -> Ask how they'd like to proceed:
-   A) Talk to Customer Service -> tell them a team member will be with them shortly
-   B) File a Complaint -> acknowledge their frustration with a warm, genuine, personalised apology based on what they share. Let them know the team will follow up.
+// ── Defaults ──────────────────────────────────────────────────────────────────
 
-Rules:
-- Never mention you are an AI unless directly asked
-- Never use technical jargon or show internal logic
-- Always match the customer's language and tone
-- Always present menu options as numbered lists using Western numerals (1, 2, 3) regardless of language - never use bullet points or Arabic-indic numerals
-- Keep responses concise - this is WhatsApp, not email
-- If a customer goes off-topic, gently redirect them to the menu
-- Any dead end or escalation -> politely close with "A member of our team will be in touch shortly"
-- This WhatsApp chat is for WAK Solutions customer service only. If a customer requests unrelated help, politely decline and redirect them to the menu. If they repeatedly try to misuse the chat, end the conversation politely with "A member of our team will be in touch shortly"`;
+const DEFAULT_STRUCTURED: StructuredConfig = {
+  businessName: "WAK Solutions",
+  industry: "AI and robotics solutions",
+  tone: "Professional",
+  customTone: "",
+  greeting: "Welcome to WAK Solutions — your strategic AI partner. We deliver innovative solutions that connect human potential with machine precision to build a smarter future.",
+  questions: [],
+  faq: [],
+  escalationRules: [],
+  closingMessage: "Thank you for contacting us. A member of our team will be in touch shortly.",
+};
+
+// ── Small helpers ─────────────────────────────────────────────────────────────
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <h2 className="text-base font-semibold text-foreground">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline gap-2">
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</label>
+        {hint && <span className="text-xs text-muted-foreground/60">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+const inputCls = "w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#0F510F] placeholder:text-muted-foreground/50";
+const textareaCls = `${inputCls} resize-none`;
+
+// ── Drag-to-reorder hook ───────────────────────────────────────────────────────
+
+function useDraggableList<T>(items: T[], setItems: (v: T[]) => void) {
+  const dragIdx = useRef<number | null>(null);
+  const overIdx = useRef<number | null>(null);
+
+  const onDragStart = (i: number) => { dragIdx.current = i; };
+  const onDragOver  = (e: React.DragEvent, i: number) => { e.preventDefault(); overIdx.current = i; };
+  const onDrop      = () => {
+    if (dragIdx.current === null || overIdx.current === null || dragIdx.current === overIdx.current) return;
+    const arr = [...items];
+    const [moved] = arr.splice(dragIdx.current, 1);
+    arr.splice(overIdx.current, 0, moved);
+    setItems(arr);
+    dragIdx.current = null;
+    overIdx.current = null;
+  };
+
+  return { onDragStart, onDragOver, onDrop };
+}
+
+// ── Questions editor ──────────────────────────────────────────────────────────
+
+function QuestionsEditor({
+  questions,
+  onChange,
+}: {
+  questions: Question[];
+  onChange: (v: Question[]) => void;
+}) {
+  const drag = useDraggableList(questions, onChange);
+
+  const add = () =>
+    onChange([...questions, { id: uid(), text: "", answerType: "free", choices: [] }]);
+
+  const update = (id: string, patch: Partial<Question>) =>
+    onChange(questions.map(q => q.id === id ? { ...q, ...patch } : q));
+
+  const remove = (id: string) => onChange(questions.filter(q => q.id !== id));
+
+  const updateChoice = (qid: string, idx: number, val: string) =>
+    onChange(questions.map(q =>
+      q.id === qid ? { ...q, choices: q.choices.map((c, i) => i === idx ? val : c) } : q
+    ));
+
+  const addChoice = (qid: string) =>
+    onChange(questions.map(q =>
+      q.id === qid ? { ...q, choices: [...q.choices, ""] } : q
+    ));
+
+  const removeChoice = (qid: string, idx: number) =>
+    onChange(questions.map(q =>
+      q.id === qid ? { ...q, choices: q.choices.filter((_, i) => i !== idx) } : q
+    ));
+
+  return (
+    <div className="space-y-2">
+      <AnimatePresence initial={false}>
+        {questions.map((q, i) => (
+          <motion.div
+            key={q.id}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            transition={{ duration: 0.15 }}
+            draggable
+            onDragStart={() => drag.onDragStart(i)}
+            onDragOver={e => drag.onDragOver(e, i)}
+            onDrop={drag.onDrop}
+            className="bg-muted/40 border border-border rounded-lg p-3 space-y-2"
+          >
+            <div className="flex items-center gap-2">
+              <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab flex-shrink-0" />
+              <span className="text-xs font-semibold text-muted-foreground w-5 flex-shrink-0">#{i + 1}</span>
+              <input
+                className={inputCls}
+                placeholder="Question text…"
+                value={q.text}
+                onChange={e => update(q.id, { text: e.target.value })}
+              />
+              <select
+                className="border border-border rounded-lg px-2 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#0F510F] flex-shrink-0"
+                value={q.answerType}
+                onChange={e => update(q.id, { answerType: e.target.value as AnswerType, choices: [] })}
+              >
+                <option value="free">Free text</option>
+                <option value="yesno">Yes / No</option>
+                <option value="multiple">Multiple choice</option>
+              </select>
+              <button
+                onClick={() => remove(q.id)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {q.answerType === "multiple" && (
+              <div className="ml-11 space-y-1.5">
+                <p className="text-xs text-muted-foreground font-medium">Answer choices:</p>
+                {q.choices.map((c, ci) => (
+                  <div key={ci} className="flex items-center gap-1.5">
+                    <input
+                      className={inputCls}
+                      placeholder={`Choice ${ci + 1}`}
+                      value={c}
+                      onChange={e => updateChoice(q.id, ci, e.target.value)}
+                    />
+                    <button
+                      onClick={() => removeChoice(q.id, ci)}
+                      className="p-1.5 rounded text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => addChoice(q.id)}
+                  className="flex items-center gap-1 text-xs text-[#0F510F] font-medium hover:underline"
+                >
+                  <Plus className="w-3 h-3" /> Add choice
+                </button>
+              </div>
+            )}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+      <button
+        onClick={add}
+        className="flex items-center gap-1.5 text-sm font-medium text-[#0F510F] border border-[#0F510F]/30 px-3 py-1.5 rounded-lg hover:bg-[#0F510F]/5 transition-colors"
+      >
+        <Plus className="w-4 h-4" /> Add Question
+      </button>
+    </div>
+  );
+}
+
+// ── FAQ editor ────────────────────────────────────────────────────────────────
+
+function FaqEditor({ items, onChange }: { items: FaqItem[]; onChange: (v: FaqItem[]) => void }) {
+  const add    = () => onChange([...items, { id: uid(), question: "", answer: "" }]);
+  const update = (id: string, patch: Partial<FaqItem>) =>
+    onChange(items.map(f => f.id === id ? { ...f, ...patch } : f));
+  const remove = (id: string) => onChange(items.filter(f => f.id !== id));
+
+  return (
+    <div className="space-y-2">
+      <AnimatePresence initial={false}>
+        {items.map(f => (
+          <motion.div
+            key={f.id}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            transition={{ duration: 0.15 }}
+            className="bg-muted/40 border border-border rounded-lg p-3 space-y-2"
+          >
+            <div className="flex items-start gap-2">
+              <div className="flex-1 space-y-2">
+                <input
+                  className={inputCls}
+                  placeholder="Question"
+                  value={f.question}
+                  onChange={e => update(f.id, { question: e.target.value })}
+                />
+                <textarea
+                  className={textareaCls}
+                  rows={2}
+                  placeholder="Answer"
+                  value={f.answer}
+                  onChange={e => update(f.id, { answer: e.target.value })}
+                />
+              </div>
+              <button
+                onClick={() => remove(f.id)}
+                className="mt-1 p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+      <button
+        onClick={add}
+        className="flex items-center gap-1.5 text-sm font-medium text-[#0F510F] border border-[#0F510F]/30 px-3 py-1.5 rounded-lg hover:bg-[#0F510F]/5 transition-colors"
+      >
+        <Plus className="w-4 h-4" /> Add Q&amp;A Pair
+      </button>
+    </div>
+  );
+}
+
+// ── Escalation rules editor ───────────────────────────────────────────────────
+
+function EscalationEditor({
+  rules,
+  onChange,
+}: {
+  rules: EscalationRule[];
+  onChange: (v: EscalationRule[]) => void;
+}) {
+  const add    = () => onChange([...rules, { id: uid(), rule: "" }]);
+  const update = (id: string, rule: string) =>
+    onChange(rules.map(r => r.id === id ? { ...r, rule } : r));
+  const remove = (id: string) => onChange(rules.filter(r => r.id !== id));
+
+  return (
+    <div className="space-y-2">
+      <AnimatePresence initial={false}>
+        {rules.map(r => (
+          <motion.div
+            key={r.id}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            transition={{ duration: 0.15 }}
+            className="flex items-center gap-2"
+          >
+            <input
+              className={inputCls}
+              placeholder="e.g. Customer asks for a refund"
+              value={r.rule}
+              onChange={e => update(r.id, e.target.value)}
+            />
+            <button
+              onClick={() => remove(r.id)}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+      <button
+        onClick={add}
+        className="flex items-center gap-1.5 text-sm font-medium text-[#0F510F] border border-[#0F510F]/30 px-3 py-1.5 rounded-lg hover:bg-[#0F510F]/5 transition-colors"
+      >
+        <Plus className="w-4 h-4" /> Add Rule
+      </button>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ChatbotConfig() {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
 
-  const [formData, setFormData] = useState({
-    businessName: "",
-    tone: "Professional",
-    greeting: "",
-    faq: "",
-    escalationRules: "",
-  });
-  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
-  const [savedAt, setSavedAt] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [config, setConfig]               = useState<StructuredConfig>(DEFAULT_STRUCTURED);
+  const [overrideActive, setOverrideActive] = useState(true);
+  const [rawPrompt, setRawPrompt]          = useState("");
+  const [previewPrompt, setPreviewPrompt]  = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen]    = useState(false);
+  const [savedAt, setSavedAt]              = useState<string | null>(null);
+  const [saving, setSaving]                = useState(false);
+  const [error, setError]                  = useState<string | null>(null);
+  const [success, setSuccess]              = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
+  // Redirect if not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      setLocation("/login");
-    }
+    if (!isLoading && !isAuthenticated) setLocation("/login");
   }, [isLoading, isAuthenticated, setLocation]);
 
+  // Load saved config on mount
   useEffect(() => {
     if (!isAuthenticated) return;
     fetch("/api/chatbot-config", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        setSystemPrompt(data.system_prompt ?? DEFAULT_SYSTEM_PROMPT);
-        setFormData({
-          businessName: data.business_name ?? "",
-          tone: data.tone ?? "Professional",
-          greeting: data.greeting ?? "",
-          faq: data.faq ?? "",
-          escalationRules: data.escalation_rules ?? "",
-        });
+      .then(r => r.json())
+      .then(data => {
+        const sc = data.structured_config;
+        if (sc && typeof sc === "object") {
+          setConfig({
+            businessName:   sc.businessName    ?? DEFAULT_STRUCTURED.businessName,
+            industry:       sc.industry        ?? DEFAULT_STRUCTURED.industry,
+            tone:           sc.tone            ?? DEFAULT_STRUCTURED.tone,
+            customTone:     sc.customTone      ?? "",
+            greeting:       sc.greeting        ?? DEFAULT_STRUCTURED.greeting,
+            questions:      sc.questions       ?? [],
+            faq:            sc.faq             ?? [],
+            escalationRules: sc.escalationRules ?? [],
+            closingMessage: sc.closingMessage  ?? DEFAULT_STRUCTURED.closingMessage,
+          });
+        }
+        setOverrideActive(data.override_active ?? true);
+        setRawPrompt(data.system_prompt ?? "");
         setSavedAt(data.updated_at ?? null);
       })
       .catch(() => {});
   }, [isAuthenticated]);
 
-  if (isLoading || !isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // Live compile preview whenever structured config changes (debounced)
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchPreview = useCallback(async () => {
+    if (overrideActive) { setPreviewPrompt(null); return; }
+    setPreviewLoading(true);
+    try {
+      const res = await fetch("/api/chatbot-config/preview", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ structured_config: config }),
+      });
+      if (res.ok) {
+        const { prompt } = await res.json();
+        setPreviewPrompt(prompt);
+      }
+    } catch (_) {}
+    setPreviewLoading(false);
+  }, [config, overrideActive]);
 
-  const handleGenerate = () => {
-    const { businessName, tone, greeting, faq, escalationRules } = formData;
-    const generated = `You are a ${tone} customer service assistant for ${businessName}.
+  useEffect(() => {
+    if (!advancedOpen) return;
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    previewTimer.current = setTimeout(fetchPreview, 400);
+    return () => { if (previewTimer.current) clearTimeout(previewTimer.current); };
+  }, [config, advancedOpen, fetchPreview]);
 
-GREETING:
-${greeting}
-
-FAQ:
-${faq}
-
-ESCALATION RULES:
-${escalationRules}
-
-Rules:
-- Never mention you are an AI unless directly asked
-- Always match the customer's language and tone
-- Keep responses concise - this is WhatsApp, not email`.trim();
-    setSystemPrompt(generated);
-  };
+  const set = <K extends keyof StructuredConfig>(key: K, val: StructuredConfig[K]) =>
+    setConfig(c => ({ ...c, [key]: val }));
 
   const handleSave = async () => {
     setSaving(true);
@@ -119,14 +416,7 @@ Rules:
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_prompt: systemPrompt,
-          business_name: formData.businessName,
-          tone: formData.tone,
-          greeting: formData.greeting,
-          faq: formData.faq,
-          escalation_rules: formData.escalationRules,
-        }),
+        body: JSON.stringify({ structured_config: config, override_active: overrideActive, raw_prompt: rawPrompt }),
       });
       if (!res.ok) {
         const body = await res.json();
@@ -134,7 +424,7 @@ Rules:
       }
       const saved = await res.json();
       setSavedAt(saved.updated_at ?? new Date().toISOString());
-      setSuccess("Saved and applied successfully.");
+      setSuccess("Saved and applied successfully. The bot will pick up the new config within 60 seconds.");
     } catch (e: any) {
       setError(e.message || "An error occurred");
     } finally {
@@ -142,14 +432,21 @@ Rules:
     }
   };
 
-  const formatSavedAt = (ts: string | null) => {
-    if (!ts) return "Never saved";
-    return `Last saved: ${new Date(ts).toLocaleString()}`;
+  const handleReset = () => {
+    setConfig(DEFAULT_STRUCTURED);
+    setOverrideActive(false);
   };
+
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Header — matches dashboard exactly */}
       <header className="h-14 bg-[#0F510F] text-white flex items-center justify-between px-5 flex-shrink-0 z-20 shadow-md">
         <div className="flex items-center gap-4">
           <img src="/logo.png" alt="WAK Solutions" className="h-[36px] shrink-0" />
@@ -162,158 +459,233 @@ Rules:
         <Link href="/">
           <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Back to Inbox</span>
+            <span className="hidden sm:inline">Back to Dashboard</span>
             <span className="sm:hidden">Back</span>
           </a>
         </Link>
       </header>
 
-      <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-6 space-y-5 pb-12">
         <div className="flex items-center gap-2">
           <Bot className="w-5 h-5 text-[#0F510F]" />
           <h1 className="text-xl font-bold text-foreground">Chatbot Config</h1>
         </div>
 
-        {/* Section 1 — Bot Setup Form */}
-        <section className="bg-card border border-border rounded-xl p-5 space-y-4">
-          <h2 className="text-base font-semibold text-foreground">Bot Setup</h2>
-
-          {/* Business Name */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Business Name
-            </label>
-            <input
-              type="text"
-              value={formData.businessName}
-              onChange={(e) => setFormData((f) => ({ ...f, businessName: e.target.value }))}
-              placeholder="WAK Solutions"
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#0F510F] placeholder:text-muted-foreground/50"
-            />
+        {/* ── Business Identity ─────────────────────────────────────── */}
+        <SectionCard title="Business Identity">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Business Name">
+              <input
+                className={inputCls}
+                placeholder="WAK Solutions"
+                value={config.businessName}
+                onChange={e => set("businessName", e.target.value)}
+              />
+            </Field>
+            <Field label="Industry / Description" hint="one line">
+              <input
+                className={inputCls}
+                placeholder="AI and robotics solutions"
+                value={config.industry}
+                onChange={e => set("industry", e.target.value)}
+              />
+            </Field>
           </div>
+          <Field label="Tone">
+            <div className="flex gap-2 flex-wrap">
+              {["Professional", "Friendly", "Formal", "Custom"].map(t => (
+                <button
+                  key={t}
+                  onClick={() => set("tone", t)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                    config.tone === t
+                      ? "bg-[#0F510F] border-[#0F510F] text-white"
+                      : "border-border text-muted-foreground hover:text-foreground hover:border-[#0F510F]/40"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            {config.tone === "Custom" && (
+              <input
+                className={`${inputCls} mt-2`}
+                placeholder="Describe the tone (e.g. warm and concise)"
+                value={config.customTone}
+                onChange={e => set("customTone", e.target.value)}
+              />
+            )}
+          </Field>
+        </SectionCard>
 
-          {/* Tone */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Tone
-            </label>
-            <select
-              value={formData.tone}
-              onChange={(e) => setFormData((f) => ({ ...f, tone: e.target.value }))}
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#0F510F]"
-            >
-              <option value="Formal">Formal</option>
-              <option value="Friendly">Friendly</option>
-              <option value="Professional">Professional</option>
-              <option value="Custom">Custom</option>
-            </select>
-          </div>
-
-          {/* Greeting Message */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Greeting Message
-            </label>
+        {/* ── Conversation Flow ─────────────────────────────────────── */}
+        <SectionCard title="Conversation Flow">
+          <Field label="Opening / Greeting Message" hint="sent at the start of every new conversation">
             <textarea
+              className={textareaCls}
               rows={3}
-              value={formData.greeting}
-              onChange={(e) => setFormData((f) => ({ ...f, greeting: e.target.value }))}
               placeholder="Welcome! How can I help you today?"
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#0F510F] placeholder:text-muted-foreground/50 resize-none"
+              value={config.greeting}
+              onChange={e => set("greeting", e.target.value)}
             />
-          </div>
+          </Field>
 
-          {/* FAQ */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              FAQ
-            </label>
+          <Field label="Qualification Questions" hint="bot walks through these in order">
+            <QuestionsEditor
+              questions={config.questions}
+              onChange={v => set("questions", v)}
+            />
+          </Field>
+
+          <Field label="Closing Message" hint="used when wrapping up a conversation">
             <textarea
-              rows={5}
-              value={formData.faq}
-              onChange={(e) => setFormData((f) => ({ ...f, faq: e.target.value }))}
-              placeholder={"Q: What are your hours?\nA: We're available 24/7..."}
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#0F510F] placeholder:text-muted-foreground/50 resize-none"
+              className={textareaCls}
+              rows={2}
+              placeholder="Thank you for contacting us. A member of our team will be in touch shortly."
+              value={config.closingMessage}
+              onChange={e => set("closingMessage", e.target.value)}
             />
-          </div>
+          </Field>
+        </SectionCard>
 
-          {/* Escalation Rules */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Escalation Rules
-            </label>
-            <textarea
-              rows={3}
-              value={formData.escalationRules}
-              onChange={(e) => setFormData((f) => ({ ...f, escalationRules: e.target.value }))}
-              placeholder="If customer mentions refund, escalate to agent"
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#0F510F] placeholder:text-muted-foreground/50 resize-none"
-            />
-          </div>
+        {/* ── Knowledge Base ────────────────────────────────────────── */}
+        <SectionCard title="Knowledge Base (FAQ)">
+          <FaqEditor
+            items={config.faq}
+            onChange={v => set("faq", v)}
+          />
+        </SectionCard>
 
+        {/* ── Escalation Rules ──────────────────────────────────────── */}
+        <SectionCard title="Escalation Rules">
+          <p className="text-xs text-muted-foreground -mt-2">
+            The bot will trigger human handover immediately when any of these conditions are detected.
+          </p>
+          <EscalationEditor
+            rules={config.escalationRules}
+            onChange={v => set("escalationRules", v)}
+          />
+        </SectionCard>
+
+        {/* ── Advanced: Raw Prompt ──────────────────────────────────── */}
+        <section className="bg-card border border-border rounded-xl overflow-hidden">
           <button
-            onClick={handleGenerate}
-            className="flex items-center gap-1.5 text-sm font-medium border border-[#0F510F] text-[#0F510F] px-4 py-2 rounded-lg hover:bg-[#0F510F]/5 transition-colors"
+            onClick={() => { setAdvancedOpen(o => !o); if (!advancedOpen) fetchPreview(); }}
+            className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-foreground hover:bg-muted/30 transition-colors"
           >
-            <Wand2 className="w-4 h-4" />
-            Generate System Prompt
+            <span>Advanced: Raw Prompt</span>
+            {advancedOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
           </button>
+
+          <AnimatePresence initial={false}>
+            {advancedOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="px-5 pb-5 space-y-4 border-t border-border">
+                  {/* Override toggle */}
+                  <div className="flex items-center justify-between pt-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Raw Override</p>
+                      <p className="text-xs text-muted-foreground">When on, the bot uses the raw text below instead of the structured fields above.</p>
+                    </div>
+                    <button
+                      onClick={() => setOverrideActive(o => !o)}
+                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${overrideActive ? "bg-amber-500" : "bg-muted"}`}
+                    >
+                      <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${overrideActive ? "translate-x-5" : "translate-x-0.5"}`} />
+                    </button>
+                  </div>
+
+                  {/* Warning banner */}
+                  {overrideActive && (
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-amber-800">
+                        <strong>Raw override is active</strong> — structured fields above are being ignored. The bot uses the text below.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Compiled preview (when override is off) */}
+                  {!overrideActive && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Compiled preview (read-only — generated from your structured fields)</span>
+                        {previewLoading && <span className="animate-pulse">Updating…</span>}
+                      </div>
+                      <textarea
+                        readOnly
+                        rows={14}
+                        className={`${textareaCls} font-mono text-xs bg-muted/30 cursor-default`}
+                        value={previewPrompt ?? ""}
+                      />
+                    </div>
+                  )}
+
+                  {/* Raw editor (when override is on) */}
+                  {overrideActive && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <EyeOff className="w-3.5 h-3.5" />
+                        <span>Raw system prompt</span>
+                      </div>
+                      <textarea
+                        rows={14}
+                        className={`${textareaCls} font-mono text-xs`}
+                        value={rawPrompt}
+                        onChange={e => setRawPrompt(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
 
-        {/* Section 2 — Raw System Prompt Editor */}
-        <section className="bg-card border border-border rounded-xl p-5 space-y-4 pb-8">
-          <h2 className="text-base font-semibold text-foreground">System Prompt</h2>
-
-          <textarea
-            rows={15}
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#0F510F] font-mono resize-y"
-          />
-
-          {/* Feedback messages */}
+        {/* ── Feedback + Actions ────────────────────────────────────── */}
+        <div className="space-y-3">
           {error && (
-            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
-              {error}
-            </p>
+            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">{error}</p>
           )}
           {success && (
-            <p className="text-sm text-[#0F510F] bg-[#0F510F]/10 border border-[#0F510F]/20 rounded-lg px-3 py-2">
-              {success}
-            </p>
+            <p className="text-sm text-[#0F510F] bg-[#0F510F]/10 border border-[#0F510F]/20 rounded-lg px-3 py-2">{success}</p>
           )}
 
-          {/* Action buttons */}
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-1.5 text-sm font-medium bg-[#0F510F] text-white px-4 py-2 rounded-lg hover:bg-[#0d4510] disabled:opacity-60 transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium bg-[#0F510F] text-white px-5 py-2.5 rounded-lg hover:bg-[#0d4510] disabled:opacity-60 transition-colors"
             >
               {saving ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Saving…
-                </>
+                <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving…</>
               ) : (
-                <>
-                  <Save className="w-3.5 h-3.5" />
-                  Save &amp; Apply
-                </>
+                <><Save className="w-3.5 h-3.5" />Save &amp; Apply</>
               )}
             </button>
 
             <button
-              onClick={() => setSystemPrompt(DEFAULT_SYSTEM_PROMPT)}
-              className="flex items-center gap-1.5 text-sm font-medium border border-border text-muted-foreground px-4 py-2 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+              onClick={handleReset}
+              className="flex items-center gap-1.5 text-sm font-medium border border-border text-muted-foreground px-5 py-2.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Reset to Default
             </button>
           </div>
 
-          <p className="text-xs text-muted-foreground">{formatSavedAt(savedAt)}</p>
-        </section>
+          {savedAt && (
+            <p className="text-xs text-muted-foreground">
+              Last saved: {new Date(savedAt).toLocaleString()}
+            </p>
+          )}
+        </div>
       </main>
     </div>
   );
