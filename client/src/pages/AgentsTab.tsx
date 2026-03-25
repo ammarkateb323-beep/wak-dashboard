@@ -3,6 +3,15 @@ import { useLocation, Link } from "wouter";
 import { ArrowLeft, Plus, UserCheck, UserX, KeyRound, Edit2, Users, RefreshCw, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
+type Period = "today" | "week" | "month" | "all";
+
+const PERIODS: { key: Period; label: string; sub: string }[] = [
+  { key: "today", label: "Today",      sub: "Today" },
+  { key: "week",  label: "This Week",  sub: "This Week" },
+  { key: "month", label: "This Month", sub: "This Month" },
+  { key: "all",   label: "All Time",   sub: "All Time" },
+];
+
 interface Agent {
   id: number;
   name: string;
@@ -10,7 +19,7 @@ interface Agent {
   role: "admin" | "agent";
   is_active: boolean;
   last_login: string | null;
-  active_chat_count: number;
+  resolved_chats: number;
   meetings_completed: number;
   avg_survey_rating: number | null;
 }
@@ -54,6 +63,7 @@ export default function AgentsTab() {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading: isAuthLoading, isAdmin } = useAuth();
 
+  const [period, setPeriod] = useState<Period>("all");
   const [agents, setAgents] = useState<Agent[]>([]);
   const [workload, setWorkload] = useState<WorkloadRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,11 +93,11 @@ export default function AgentsTab() {
     if (!isAuthLoading && isAuthenticated && !isAdmin) setLocation("/");
   }, [isAuthLoading, isAuthenticated, isAdmin, setLocation]);
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (p: Period = period) => {
     setLoading(true);
     try {
       const [aRes, wRes] = await Promise.all([
-        fetch("/api/agents", { credentials: "include" }),
+        fetch(`/api/agents?period=${p}`, { credentials: "include" }),
         fetch("/api/agents/workload", { credentials: "include" }),
       ]);
       if (aRes.ok) setAgents(await aRes.json());
@@ -97,15 +107,15 @@ export default function AgentsTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [period]);
 
   useEffect(() => {
     if (isAuthenticated && isAdmin) {
-      fetchAll();
-      const interval = setInterval(fetchAll, 60000);
+      fetchAll(period);
+      const interval = setInterval(() => fetchAll(period), 60000);
       return () => clearInterval(interval);
     }
-  }, [isAuthenticated, isAdmin, fetchAll]);
+  }, [isAuthenticated, isAdmin, period]);
 
   const toggleActive = async (agent: Agent) => {
     const endpoint = agent.is_active ? "deactivate" : "activate";
@@ -196,7 +206,7 @@ export default function AgentsTab() {
           <span className="hidden sm:block text-sm text-white/70">Agents</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={fetchAll} title="Refresh" className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white px-3 py-1.5 rounded-md hover:bg-white/10 transition-colors">
+          <button onClick={() => fetchAll(period)} title="Refresh" className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white px-3 py-1.5 rounded-md hover:bg-white/10 transition-colors">
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
           <Link href="/"><a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
@@ -226,6 +236,23 @@ export default function AgentsTab() {
 
           {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-4 py-2">{error}</p>}
 
+          {/* Period filter */}
+          <div className="flex gap-1 bg-muted p-1 rounded-xl w-fit">
+            {PERIODS.map(p => (
+              <button
+                key={p.key}
+                onClick={() => setPeriod(p.key)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  period === p.key
+                    ? "bg-[#0F510F] text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             {loading ? (
               <div className="flex items-center justify-center py-16">
@@ -237,7 +264,10 @@ export default function AgentsTab() {
                   <tr className="border-b border-border bg-muted/50">
                     <th className="text-left px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agent</th>
                     <th className="text-left px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-28">Role / Status</th>
-                    <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-14">Chats</th>
+                    <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-20">
+                      <span className="block">Chats Resolved</span>
+                      <span className="block normal-case font-normal text-muted-foreground/60">{PERIODS.find(p => p.key === period)!.sub}</span>
+                    </th>
                     <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-20">Meetings</th>
                     <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-16">Rating</th>
                     <th className="hidden md:table-cell text-left px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-28">Last Login</th>
@@ -263,9 +293,9 @@ export default function AgentsTab() {
                           </Badge>
                         </div>
                       </td>
-                      {/* Active Chats */}
+                      {/* Chats Resolved */}
                       <td className="px-1 py-3 text-center font-semibold text-foreground">
-                        {agent.active_chat_count}
+                        {agent.resolved_chats}
                       </td>
                       {/* Meetings Done */}
                       <td className="px-1 py-3 text-center">

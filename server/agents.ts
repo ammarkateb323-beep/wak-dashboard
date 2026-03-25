@@ -70,12 +70,21 @@ export function registerAgentRoutes(app: any, requireAdmin: any): void {
   });
 
   // GET /api/agents
-  app.get('/api/agents', requireAdmin, async (_req: any, res: any) => {
+  app.get('/api/agents', requireAdmin, async (req: any, res: any) => {
     try {
+      const period = ['today', 'week', 'month', 'all'].includes(req.query.period)
+        ? req.query.period : 'all';
+      const dateFilter =
+        period === 'today' ? `AND e.created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'UTC')` :
+        period === 'week'  ? `AND e.created_at >= DATE_TRUNC('week', NOW() AT TIME ZONE 'UTC')` :
+        period === 'month' ? `AND e.created_at >= DATE_TRUNC('month', NOW() AT TIME ZONE 'UTC')` :
+        '';
       const result = await pool.query(`
         SELECT
           a.id, a.name, a.email, a.role, a.is_active, a.last_login,
-          COUNT(e.customer_phone) FILTER (WHERE e.status = 'open')::int AS active_chat_count,
+          COUNT(e.customer_phone) FILTER (
+            WHERE e.status = 'resolved' ${dateFilter}
+          )::int AS resolved_chats,
           (SELECT COUNT(*)::int FROM meetings m
            WHERE m.agent_id = a.id AND m.status = 'completed') AS meetings_completed,
           (SELECT ROUND(AVG(sa.answer_rating)::numeric, 1)
