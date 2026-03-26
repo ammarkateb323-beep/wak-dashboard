@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
-import { ArrowLeft, X, BookOpen, Smartphone } from "lucide-react";
+import { ArrowLeft, X, BookOpen, Globe } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 // ── iOS install wizard ──────────────────────────────────────────────────────
@@ -573,7 +573,7 @@ export default function Guide() {
         <div className="max-w-3xl mx-auto px-4 flex gap-0">
           {([
             ["guide", BookOpen, "User Guide"],
-            ["setup", Smartphone, "iOS Setup"],
+            ["setup", Globe, "Progressive Web App"],
           ] as const).map(([key, Icon, label]) => (
             <button
               key={key}
