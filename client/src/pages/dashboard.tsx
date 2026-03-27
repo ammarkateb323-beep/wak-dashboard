@@ -13,7 +13,7 @@ import { ChatArea } from "@/components/chat-area";
 export default function Dashboard() {
   const [location, setLocation] = useLocation();
   const { isAuthenticated, isLoading: isAuthLoading, isAdmin } = useAuth();
-  const { lang, toggleLang } = useLanguage();
+  const { lang, toggleLang, t } = useLanguage();
   const { mutate: logout } = useLogout();
   const { data: conversations = [], isLoading: isEscalationsLoading, isFetching } = useConversations();
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
@@ -102,7 +102,7 @@ export default function Dashboard() {
           <div className="hidden sm:block">
             <span className="font-semibold text-sm text-white/90">WAK Solutions</span>
             <span className="text-white/40 mx-2">—</span>
-            <span className="text-sm text-white/70">Agent Dashboard</span>
+            <span className="text-sm text-white/70">{t("agentDashboard")}</span>
           </div>
         </div>
 
@@ -116,84 +116,85 @@ export default function Dashboard() {
             {connected ? (
               <>
                 <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-white/70 hidden sm:inline">Online</span>
+                <span className="text-white/70 hidden sm:inline">{t("online")}</span>
                 <Wifi className="w-3.5 h-3.5 text-green-400" />
               </>
             ) : (
               <>
                 <span className="w-2 h-2 rounded-full bg-yellow-400" />
-                <span className="text-white/70 hidden sm:inline">Connecting...</span>
+                <span className="text-white/70 hidden sm:inline">{t("connecting")}</span>
                 <WifiOff className="w-3.5 h-3.5 text-yellow-400" />
               </>
             )}
           </div>
 
-          {/* Nav links — desktop only */}
-          <div className="hidden md:flex items-center gap-1">
+          {/* Nav links — desktop only, icon-only with tooltips */}
+          <div className="hidden md:flex items-center gap-0.5">
             <Link href="/inbox">
-              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-                <Inbox className="w-3.5 h-3.5" /><span>Inbox</span>
+              <a title={t("inbox")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
+                <Inbox className="w-4 h-4" />
               </a>
             </Link>
             {isAdmin && (
               <Link href="/agents">
-                <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-                  <Users className="w-3.5 h-3.5" /><span>Agents</span>
+                <a title={t("agents")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
+                  <Users className="w-4 h-4" />
                 </a>
               </Link>
             )}
             <Link href="/statistics">
-              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-                <BarChart2 className="w-3.5 h-3.5" /><span>Statistics</span>
+              <a title={t("statistics")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
+                <BarChart2 className="w-4 h-4" />
               </a>
             </Link>
             <Link href="/meetings">
-              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-                <Video className="w-3.5 h-3.5" /><span>Meetings</span>
+              <a title={t("meetings")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
+                <Video className="w-4 h-4" />
               </a>
             </Link>
             <Link href="/chatbot-config">
-              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-                <Bot className="w-3.5 h-3.5" /><span>Chatbot Config</span>
+              <a title={t("chatbotConfig")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
+                <Bot className="w-4 h-4" />
               </a>
             </Link>
             <Link href="/surveys">
-              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-                <ClipboardList className="w-3.5 h-3.5" /><span>Surveys</span>
+              <a title={t("surveys")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
+                <ClipboardList className="w-4 h-4" />
               </a>
             </Link>
             <Link href="/guide">
-              <a className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10">
-                <BookOpen className="w-3.5 h-3.5" /><span>Guide</span>
+              <a title={t("guide")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
+                <BookOpen className="w-4 h-4" />
               </a>
             </Link>
             <button
               onClick={handleRegisterBiometric}
-              title="Set up Face ID / Fingerprint login"
-              className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10"
+              title={t("biometricSetup")}
+              className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10"
             >
-              <Fingerprint className="w-3.5 h-3.5" /><span>Biometric</span>
+              <Fingerprint className="w-4 h-4" />
             </button>
           </div>
 
           {/* Language toggle — always visible */}
           <button
             onClick={toggleLang}
-            title={lang === "en" ? "Switch to Arabic" : "Switch to English"}
-            className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10"
+            title={t("switchLang")}
+            className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-2.5 py-1.5 rounded-md hover:bg-white/10"
           >
             <Globe className="w-3.5 h-3.5" />
-            <span>{lang === "en" ? "AR" : "EN"}</span>
+            <span className="font-medium">{t("langCode")}</span>
           </button>
 
           {/* Logout — always visible */}
           <button
             data-testid="button-logout"
             onClick={handleLogout}
-            className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10"
+            title={t("logout")}
+            className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-2.5 py-1.5 rounded-md hover:bg-white/10"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Logout</span>
+            <span className="hidden md:inline">{t("logout")}</span>
           </button>
 
           {/* Hamburger — mobile only */}
@@ -223,7 +224,7 @@ export default function Dashboard() {
           >
             {/* Drawer header */}
             <div className="h-14 bg-[#0F510F] flex items-center justify-between px-5">
-              <span className="text-white font-semibold text-sm">Menu</span>
+              <span className="text-white font-semibold text-sm">{t("menu")}</span>
               <button
                 onClick={() => setMenuOpen(false)}
                 className="text-white/70 hover:text-white p-1 rounded transition-colors"
@@ -237,13 +238,13 @@ export default function Dashboard() {
             <nav className="flex-1 overflow-y-auto py-2">
               {(
                 [
-                  { href: "/inbox",         icon: <Inbox className="w-5 h-5" />,        label: "Inbox" },
-                  ...(isAdmin ? [{ href: "/agents", icon: <Users className="w-5 h-5" />, label: "Agents" }] : []),
-                  { href: "/statistics",    icon: <BarChart2 className="w-5 h-5" />,     label: "Statistics" },
-                  { href: "/meetings",      icon: <Video className="w-5 h-5" />,          label: "Meetings" },
-                  { href: "/chatbot-config",icon: <Bot className="w-5 h-5" />,            label: "Chatbot Config" },
-                  { href: "/surveys",       icon: <ClipboardList className="w-5 h-5" />,  label: "Surveys" },
-                  { href: "/guide",         icon: <BookOpen className="w-5 h-5" />,       label: "Guide" },
+                  { href: "/inbox",         icon: <Inbox className="w-5 h-5" />,        label: t("inbox") },
+                  ...(isAdmin ? [{ href: "/agents", icon: <Users className="w-5 h-5" />, label: t("agents") }] : []),
+                  { href: "/statistics",    icon: <BarChart2 className="w-5 h-5" />,     label: t("statistics") },
+                  { href: "/meetings",      icon: <Video className="w-5 h-5" />,          label: t("meetings") },
+                  { href: "/chatbot-config",icon: <Bot className="w-5 h-5" />,            label: t("chatbotConfig") },
+                  { href: "/surveys",       icon: <ClipboardList className="w-5 h-5" />,  label: t("surveys") },
+                  { href: "/guide",         icon: <BookOpen className="w-5 h-5" />,       label: t("guide") },
                 ] as { href: string; icon: React.ReactNode; label: string }[]
               ).map(item => (
                 <Link key={item.href} href={item.href}>
@@ -269,7 +270,7 @@ export default function Dashboard() {
                 className="w-full flex items-center gap-4 px-5 py-3.5 text-sm font-medium text-foreground hover:bg-muted transition-colors min-h-[48px]"
               >
                 <span className="text-muted-foreground"><Fingerprint className="w-5 h-5" /></span>
-                Biometric Setup
+                {t("biometricSetup")}
               </button>
 
               {/* Language toggle */}
@@ -278,7 +279,7 @@ export default function Dashboard() {
                 className="w-full flex items-center gap-4 px-5 py-3.5 text-sm font-medium text-foreground hover:bg-muted transition-colors min-h-[48px]"
               >
                 <span className="text-muted-foreground"><Globe className="w-5 h-5" /></span>
-                {lang === "en" ? "Switch to Arabic" : "Switch to English"}
+                {t("switchLang")}
               </button>
             </nav>
           </div>
@@ -290,10 +291,7 @@ export default function Dashboard() {
         <div className="bg-blue-50 border-b border-blue-200 px-5 py-2.5 flex items-center justify-between gap-3 flex-shrink-0">
           <div className="flex items-center gap-2 text-sm text-blue-800">
             <Share className="w-4 h-4 flex-shrink-0" />
-            <span>
-              To receive notifications on iOS, tap{" "}
-              <strong>Share</strong> → <strong>Add to Home Screen</strong>, then open from your Home Screen.
-            </span>
+            <span>{t("iosInstallPrompt")}</span>
           </div>
           <button
             onClick={dismissInstallPrompt}
@@ -310,13 +308,13 @@ export default function Dashboard() {
         <div className="bg-amber-50 border-b border-amber-200 px-5 py-2.5 flex items-center justify-between gap-3 flex-shrink-0">
           <div className="flex items-center gap-2 text-sm text-amber-800">
             <Bell className="w-4 h-4 flex-shrink-0" />
-            <span>Enable notifications to get alerted when customers message you.</span>
+            <span>{t("enableNotificationsPrompt")}</span>
           </div>
           <button
             onClick={enableNotifications}
             className="flex-shrink-0 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg transition-colors"
           >
-            Enable Notifications
+            {t("enableNotifications")}
           </button>
         </div>
       )}
