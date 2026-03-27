@@ -128,51 +128,53 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Nav links — desktop only, icon-only with tooltips */}
-          <div className="hidden md:flex items-center gap-0.5">
+          {/* Nav links — desktop only
+              md–xl  (768–1280px): icons only, tight padding
+              xl+    (1280px+):    icons + text labels               */}
+          <div className="hidden md:flex items-center gap-0.5 xl:gap-1">
             <Link href="/inbox">
-              <a title={t("inbox")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
-                <Inbox className="w-4 h-4" />
+              <a title={t("inbox")} className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors p-2 xl:px-3 xl:py-1.5 rounded-md hover:bg-white/10">
+                <Inbox className="w-4 h-4 shrink-0" /><span className="hidden xl:inline">{t("inbox")}</span>
               </a>
             </Link>
             {isAdmin && (
               <Link href="/agents">
-                <a title={t("agents")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
-                  <Users className="w-4 h-4" />
+                <a title={t("agents")} className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors p-2 xl:px-3 xl:py-1.5 rounded-md hover:bg-white/10">
+                  <Users className="w-4 h-4 shrink-0" /><span className="hidden xl:inline">{t("agents")}</span>
                 </a>
               </Link>
             )}
             <Link href="/statistics">
-              <a title={t("statistics")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
-                <BarChart2 className="w-4 h-4" />
+              <a title={t("statistics")} className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors p-2 xl:px-3 xl:py-1.5 rounded-md hover:bg-white/10">
+                <BarChart2 className="w-4 h-4 shrink-0" /><span className="hidden xl:inline">{t("statistics")}</span>
               </a>
             </Link>
             <Link href="/meetings">
-              <a title={t("meetings")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
-                <Video className="w-4 h-4" />
+              <a title={t("meetings")} className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors p-2 xl:px-3 xl:py-1.5 rounded-md hover:bg-white/10">
+                <Video className="w-4 h-4 shrink-0" /><span className="hidden xl:inline">{t("meetings")}</span>
               </a>
             </Link>
             <Link href="/chatbot-config">
-              <a title={t("chatbotConfig")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
-                <Bot className="w-4 h-4" />
+              <a title={t("chatbotConfig")} className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors p-2 xl:px-3 xl:py-1.5 rounded-md hover:bg-white/10">
+                <Bot className="w-4 h-4 shrink-0" /><span className="hidden xl:inline">{t("chatbotConfig")}</span>
               </a>
             </Link>
             <Link href="/surveys">
-              <a title={t("surveys")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
-                <ClipboardList className="w-4 h-4" />
+              <a title={t("surveys")} className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors p-2 xl:px-3 xl:py-1.5 rounded-md hover:bg-white/10">
+                <ClipboardList className="w-4 h-4 shrink-0" /><span className="hidden xl:inline">{t("surveys")}</span>
               </a>
             </Link>
             <Link href="/guide">
-              <a title={t("guide")} className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10">
-                <BookOpen className="w-4 h-4" />
+              <a title={t("guide")} className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors p-2 xl:px-3 xl:py-1.5 rounded-md hover:bg-white/10">
+                <BookOpen className="w-4 h-4 shrink-0" /><span className="hidden xl:inline">{t("guide")}</span>
               </a>
             </Link>
             <button
               onClick={handleRegisterBiometric}
               title={t("biometricSetup")}
-              className="text-white/70 hover:text-white transition-colors p-2 rounded-md hover:bg-white/10"
+              className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors p-2 xl:px-3 xl:py-1.5 rounded-md hover:bg-white/10"
             >
-              <Fingerprint className="w-4 h-4" />
+              <Fingerprint className="w-4 h-4 shrink-0" /><span className="hidden xl:inline">Biometric</span>
             </button>
           </div>
 
