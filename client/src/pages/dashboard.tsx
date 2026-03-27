@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
-import { LogOut, Wifi, WifiOff, Fingerprint, Bell, Share, X, BookOpen, BarChart2, Bot, Video, ClipboardList, Inbox, Users, Menu } from "lucide-react";
+import { LogOut, Wifi, WifiOff, Fingerprint, Bell, Share, X, BookOpen, BarChart2, Bot, Video, ClipboardList, Inbox, Users, Menu, Globe } from "lucide-react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { useAuth, useLogout } from "@/hooks/use-auth";
+import { useLanguage } from "@/lib/language-context";
 import { useConversations } from "@/hooks/use-conversations";
 import { usePushNotifications } from "@/hooks/use-push";
 import { useVisibilityRefetch } from "@/hooks/use-visibility-refetch";
@@ -12,6 +13,7 @@ import { ChatArea } from "@/components/chat-area";
 export default function Dashboard() {
   const [location, setLocation] = useLocation();
   const { isAuthenticated, isLoading: isAuthLoading, isAdmin } = useAuth();
+  const { lang, toggleLang } = useLanguage();
   const { mutate: logout } = useLogout();
   const { data: conversations = [], isLoading: isEscalationsLoading, isFetching } = useConversations();
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
@@ -174,6 +176,16 @@ export default function Dashboard() {
             </button>
           </div>
 
+          {/* Language toggle — always visible */}
+          <button
+            onClick={toggleLang}
+            title={lang === "en" ? "Switch to Arabic" : "Switch to English"}
+            className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-white/10"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>{lang === "en" ? "AR" : "EN"}</span>
+          </button>
+
           {/* Logout — always visible */}
           <button
             data-testid="button-logout"
@@ -258,6 +270,15 @@ export default function Dashboard() {
               >
                 <span className="text-muted-foreground"><Fingerprint className="w-5 h-5" /></span>
                 Biometric Setup
+              </button>
+
+              {/* Language toggle */}
+              <button
+                onClick={() => { toggleLang(); setMenuOpen(false); }}
+                className="w-full flex items-center gap-4 px-5 py-3.5 text-sm font-medium text-foreground hover:bg-muted transition-colors min-h-[48px]"
+              >
+                <span className="text-muted-foreground"><Globe className="w-5 h-5" /></span>
+                {lang === "en" ? "Switch to Arabic" : "Switch to English"}
               </button>
             </nav>
           </div>
