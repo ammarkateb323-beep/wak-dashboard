@@ -1252,6 +1252,264 @@ export async function registerRoutes(
   // ── Agent Routes ───────────────────────────────────────────────────────────
   registerAgentRoutes(app, requireAdmin);
 
+  // ── Customer Journey Routes ───────────────────────────────────────────────
+
+  // GET /api/customers — paginated list of all known customers
+  app.get('/api/customers', requireAdmin, async (req, res) => {
+    const page   = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit  = 20;
+    const offset = (page - 1) * limit;
+    const search = ((req.query.search as string) || '').trim();
+
+    try {
+      const searchClause = search
+        ? `AND (all_phones.phone ILIKE $3 OR c.name ILIKE $3)`
+        : '';
+      const params: any[] = search ? [limit, offset, `%${search}%`] : [limit, offset];
+
+      const rows = await pool.query(`
+        WITH all_phones AS (
+          SELECT DISTINCT customer_phone AS phone FROM messages
+          UNION
+          SELECT DISTINCT customer_phone FROM escalations
+          UNION
+          SELECT DISTINCT customer_phone FROM meetings
+        )
+        SELECT
+          all_phones.phone,
+          c.name,
+          c.source,
+          MIN(m.created_at)  AS first_seen,
+          MAX(m.created_at)  AS last_seen,
+          (
+            SELECT COUNT(*) FROM messages   WHERE customer_phone = all_phones.phone
+          ) +
+          (
+            SELECT COUNT(*) FROM escalations WHERE customer_phone = all_phones.phone
+          ) +
+          (
+            SELECT COUNT(*) FROM meetings    WHERE customer_phone = all_phones.phone
+          ) +
+          (
+            SELECT COUNT(*) FROM survey_responses WHERE customer_phone = all_phones.phone
+          ) +
+          (
+            SELECT COUNT(*) FROM orders      WHERE customer_phone = all_phones.phone
+          ) AS touchpoints
+        FROM all_phones
+        LEFT JOIN contacts c  ON c.phone_number = all_phones.phone
+        LEFT JOIN messages m  ON m.customer_phone = all_phones.phone
+        ${searchClause}
+        GROUP BY all_phones.phone, c.name, c.source
+        ORDER BY first_seen DESC NULLS LAST
+        LIMIT $1 OFFSET $2
+      `, params);
+
+      const totalParams: any[] = search ? [`%${search}%`] : [];
+      const totalQ = search
+        ? `SELECT COUNT(*) FROM (
+             SELECT DISTINCT all_phones.phone
+             FROM (
+               SELECT DISTINCT customer_phone AS phone FROM messages
+               UNION SELECT DISTINCT customer_phone FROM escalations
+               UNION SELECT DISTINCT customer_phone FROM meetings
+             ) all_phones
+             LEFT JOIN contacts c ON c.phone_number = all_phones.phone
+             WHERE all_phones.phone ILIKE $1 OR c.name ILIKE $1
+           ) t`
+        : `SELECT COUNT(*) FROM (
+             SELECT customer_phone FROM messages
+             UNION SELECT customer_phone FROM escalations
+             UNION SELECT customer_phone FROM meetings
+           ) t`;
+      const totalRes = await pool.query(totalQ, totalParams);
+
+      res.json({
+        customers: rows.rows.map(r => ({
+          phone:       r.phone,
+          name:        r.name || null,
+          source:      r.source || null,
+          firstSeen:   r.first_seen,
+          lastSeen:    r.last_seen,
+          touchpoints: Number(r.touchpoints),
+        })),
+        total: Number(totalRes.rows[0].count),
+        page,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/customers/funnel — stage counts
+  app.get('/api/customers/funnel', requireAdmin, async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT
+          (SELECT COUNT(DISTINCT customer_phone) FROM messages)                              AS first_contact,
+          (SELECT COUNT(DISTINCT customer_phone) FROM messages WHERE sender IN ('ai','agent'))AS bot_conversation,
+          (SELECT COUNT(DISTINCT customer_phone) FROM escalations)                           AS escalated,
+          (SELECT COUNT(DISTINCT customer_phone) FROM meetings)                              AS meeting_booked,
+          (SELECT COUNT(DISTINCT customer_phone) FROM survey_responses WHERE submitted = true) AS survey_submitted
+      `);
+      const r = result.rows[0];
+      res.json({
+        stages: [
+          { stage: 'First Contact',       count: Number(r.first_contact)    },
+          { stage: 'Bot Conversation',    count: Number(r.bot_conversation) },
+          { stage: 'Escalated to Agent',  count: Number(r.escalated)        },
+          { stage: 'Meeting Booked',      count: Number(r.meeting_booked)   },
+          { stage: 'Survey Submitted',    count: Number(r.survey_submitted) },
+        ],
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/customers/:phone/journey — full sorted timeline
+  app.get('/api/customers/:phone/journey', requireAdmin, async (req, res) => {
+    const phone = decodeURIComponent(req.params.phone);
+    try {
+      const [msgRes, escRes, meetRes, survRes, ordRes, contactRes] = await Promise.all([
+        pool.query(
+          `SELECT id, direction, sender, message_text, created_at
+           FROM messages WHERE customer_phone = $1 ORDER BY created_at ASC`,
+          [phone]
+        ),
+        pool.query(
+          `SELECT id, escalation_reason, status, assigned_agent_id, created_at
+           FROM escalations WHERE customer_phone = $1 ORDER BY created_at ASC`,
+          [phone]
+        ),
+        pool.query(
+          `SELECT id, status, meeting_link, meeting_token, created_at, scheduled_at
+           FROM meetings WHERE customer_phone = $1 ORDER BY created_at ASC`,
+          [phone]
+        ),
+        pool.query(
+          `SELECT sr.id, sr.submitted, sr.created_at, sr.submitted_at, s.title
+           FROM survey_responses sr
+           LEFT JOIN surveys s ON s.id = sr.survey_id
+           WHERE sr.customer_phone = $1 ORDER BY sr.created_at ASC`,
+          [phone]
+        ),
+        pool.query(
+          `SELECT id, order_number, status, details, created_at
+           FROM orders WHERE customer_phone = $1 ORDER BY created_at ASC`,
+          [phone]
+        ),
+        pool.query(
+          `SELECT name, source FROM contacts WHERE phone_number = $1 LIMIT 1`,
+          [phone]
+        ),
+      ]);
+
+      const timeline: any[] = [];
+
+      // Messages: first_contact for the earliest, then group consecutive runs
+      const msgs = msgRes.rows;
+      if (msgs.length > 0) {
+        timeline.push({
+          type:      'first_contact',
+          timestamp: msgs[0].created_at,
+          summary:   'First contact via WhatsApp',
+          meta:      { message: msgs[0].message_text?.slice(0, 120) },
+        });
+
+        // Group remaining messages into bot/agent blocks
+        let i = 1;
+        while (i < msgs.length) {
+          const sender  = msgs[i].sender;
+          const isAgent = sender === 'agent';
+          const type    = isAgent ? 'agent_message' : 'bot_message';
+          let count     = 0;
+          const start   = msgs[i].created_at;
+          while (i < msgs.length && msgs[i].sender === sender) { count++; i++; }
+          const end = msgs[i - 1].created_at;
+          timeline.push({
+            type,
+            timestamp: start,
+            summary:   `${count} ${isAgent ? 'agent' : 'bot'} message${count !== 1 ? 's' : ''}`,
+            meta:      { count, from: start, to: end },
+          });
+        }
+      }
+
+      // Escalations
+      for (const e of escRes.rows) {
+        timeline.push({
+          type:      'escalation',
+          timestamp: e.created_at,
+          summary:   e.escalation_reason || 'Escalated to agent',
+          meta:      { status: e.status, assigned_agent_id: e.assigned_agent_id, reason: e.escalation_reason },
+        });
+      }
+
+      // Meetings
+      for (const m of meetRes.rows) {
+        timeline.push({
+          type:      'meeting_booked',
+          timestamp: m.created_at,
+          summary:   'Meeting booked',
+          meta:      { meeting_token: m.meeting_token, status: m.status },
+        });
+        if (m.status === 'completed' && m.scheduled_at) {
+          timeline.push({
+            type:      'meeting_completed',
+            timestamp: m.scheduled_at,
+            summary:   'Meeting completed',
+            meta:      { meeting_token: m.meeting_token },
+          });
+        }
+      }
+
+      // Survey responses
+      for (const s of survRes.rows) {
+        timeline.push({
+          type:      'survey_sent',
+          timestamp: s.created_at,
+          summary:   `Survey sent${s.title ? ': ' + s.title : ''}`,
+          meta:      { survey_title: s.title },
+        });
+        if (s.submitted && s.submitted_at) {
+          timeline.push({
+            type:      'survey_submitted',
+            timestamp: s.submitted_at,
+            summary:   `Survey submitted${s.title ? ': ' + s.title : ''}`,
+            meta:      { survey_title: s.title },
+          });
+        }
+      }
+
+      // Orders
+      for (const o of ordRes.rows) {
+        timeline.push({
+          type:      'order',
+          timestamp: o.created_at,
+          summary:   `Order ${o.order_number} — ${o.status}`,
+          meta:      { order_number: o.order_number, status: o.status, details: o.details },
+        });
+      }
+
+      // Sort all events ascending
+      timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      const contact = contactRes.rows[0];
+      res.json({
+        customer: {
+          phone,
+          name:      contact?.name || null,
+          source:    contact?.source || null,
+          firstSeen: msgs[0]?.created_at || null,
+        },
+        timeline,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Contacts Routes ────────────────────────────────────────────────────────
 
   app.get('/api/contacts', requireAdmin, async (req, res) => {
