@@ -307,6 +307,10 @@ export const en = {
   chatReplyPlaceholder: "Reply to customer...",
   chatResolveIssue: "Resolve Issue",
   chatConfirmResolve: "Are you sure you want to close this conversation?",
+  // ── Voice notes ───────────────────────────────────────────────────────────
+  voiceNote: "Voice Note",
+  voiceNoteTranscription: "Transcription",
+  voiceNoteUnavailable: "Voice message — transcription unavailable",
 } as const;
 
 export const ar: Record<keyof typeof en, string> = {
@@ -618,6 +622,10 @@ export const ar: Record<keyof typeof en, string> = {
   chatReplyPlaceholder: "الرد على العميل...",
   chatResolveIssue: "إغلاق المشكلة",
   chatConfirmResolve: "هل أنت متأكد من إغلاق هذه المحادثة؟",
+  // ── Voice notes ───────────────────────────────────────────────────────────
+  voiceNote: "رسالة صوتية",
+  voiceNoteTranscription: "النص المكتوب",
+  voiceNoteUnavailable: "رسالة صوتية — النص غير متاح",
 } as const;
 
 export type TranslationKey = keyof typeof en;

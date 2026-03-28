@@ -10,6 +10,10 @@ export const messages = pgTable("messages", {
   created_at: timestamp("created_at").defaultNow(),
   sender: text("sender").notNull(), // 'customer' | 'ai' | 'agent'
   escalation_id: integer("escalation_id"),
+  // Voice note fields — null for ordinary text messages
+  media_type: text("media_type"),      // 'audio' for voice notes
+  media_url: text("media_url"),        // playback URL served by the bot backend
+  transcription: text("transcription"), // Whisper speech-to-text output
 });
 
 export const escalations = pgTable("escalations", {

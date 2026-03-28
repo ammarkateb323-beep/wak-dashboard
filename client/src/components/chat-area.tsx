@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
-import { Send, CheckCircle2, User, Bot, HeadphonesIcon, Info, ArrowLeft, UserCheck } from "lucide-react";
+import { Send, CheckCircle2, User, Bot, HeadphonesIcon, Info, ArrowLeft, UserCheck, Mic } from "lucide-react";
 import { Button } from "./ui-elements";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
@@ -229,11 +229,87 @@ function ActiveChat({ conversation, onClose }: { conversation: Conversation; onC
   );
 }
 
+function VoiceNoteBubble({
+  message,
+  isCustomer,
+}: {
+  message: Message;
+  isCustomer: boolean;
+}) {
+  const { t } = useLanguage();
+  const hasTranscription =
+    message.transcription && message.transcription.trim().length > 0;
+
+  return (
+    <div className={cn(
+      "px-4 py-3 rounded-2xl shadow-sm min-w-[220px] max-w-full",
+      isCustomer
+        ? "bg-white text-foreground border border-border/40 rounded-tl-sm"
+        : "bg-secondary text-white rounded-tr-sm"
+    )}>
+      {/* Header row */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className={cn(
+          "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0",
+          isCustomer ? "bg-primary/10" : "bg-white/20"
+        )}>
+          <Mic className={cn("w-3.5 h-3.5", isCustomer ? "text-primary" : "text-white")} />
+        </div>
+        <span className={cn(
+          "text-xs font-semibold",
+          isCustomer ? "text-foreground/70" : "text-white/80"
+        )}>
+          {t("voiceNote")}
+        </span>
+      </div>
+
+      {/* Native audio player */}
+      {message.media_url && (
+        <audio
+          controls
+          preload="none"
+          src={message.media_url}
+          className="w-full h-8 mb-2"
+          style={{ colorScheme: isCustomer ? "light" : "dark" }}
+        />
+      )}
+
+      {/* Transcription */}
+      {hasTranscription ? (
+        <div className={cn(
+          "text-[12px] leading-relaxed border-t pt-2 mt-1",
+          isCustomer
+            ? "border-border/30 text-foreground/60"
+            : "border-white/20 text-white/70"
+        )}>
+          <span className={cn(
+            "font-semibold text-[10px] uppercase tracking-wide mr-1",
+            isCustomer ? "text-foreground/40" : "text-white/50"
+          )}>
+            {t("voiceNoteTranscription")}:
+          </span>
+          <span className="italic">{message.transcription}</span>
+        </div>
+      ) : (
+        !message.media_url && (
+          <p className={cn(
+            "text-[13px] italic",
+            isCustomer ? "text-foreground/50" : "text-white/60"
+          )}>
+            {t("voiceNoteUnavailable")}
+          </p>
+        )
+      )}
+    </div>
+  );
+}
+
 function MessageBubble({ message }: { message: Message }) {
   const { t } = useLanguage();
   const isCustomer = message.sender === 'customer';
   const isAI = message.sender === 'ai';
   const isAgent = message.sender === 'agent';
+  const isVoiceNote = message.media_type === 'audio';
 
   return (
     <div className={cn(
@@ -252,16 +328,21 @@ function MessageBubble({ message }: { message: Message }) {
           </span>
         </div>
 
-        <div className={cn(
-          "px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-sm",
-          isCustomer
-            ? "bg-white text-foreground border border-border/40 rounded-tl-sm"
-            : isAI
-              ? "bg-secondary text-white rounded-tr-sm"
-              : "bg-primary text-white rounded-tr-sm"
-        )}>
-          {message.message_text}
-        </div>
+        {isVoiceNote ? (
+          <VoiceNoteBubble message={message} isCustomer={isCustomer} />
+        ) : (
+          <div className={cn(
+            "px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-sm",
+            isCustomer
+              ? "bg-white text-foreground border border-border/40 rounded-tl-sm"
+              : isAI
+                ? "bg-secondary text-white rounded-tr-sm"
+                : "bg-primary text-white rounded-tr-sm"
+          )}>
+            {message.message_text}
+          </div>
+        )}
+
         <span className="text-[10px] text-muted-foreground mt-1 px-1">
           {format(new Date(message.created_at!), "h:mm a")}
         </span>
