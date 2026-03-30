@@ -118,7 +118,7 @@ app.use((req, res, next) => {
     },
     store: new PgSession({
       pool,
-      tableName: 'sessions',
+      tableName: 'session',
       createTableIfMissing: true,
     }),
     resave: false,
