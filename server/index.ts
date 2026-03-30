@@ -2,9 +2,9 @@ import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPgSimple from "connect-pg-simple";
 
-const MemoryStore = createMemoryStore(session);
+const PgSession = connectPgSimple(session);
 const app = express();
 const httpServer = createServer(app);
 
@@ -43,22 +43,6 @@ app.use(express.urlencoded({ extended: false }));
 
 // Trust Railway's reverse proxy so session cookies work correctly on HTTPS
 app.set('trust proxy', 1);
-
-// Session middleware - MUST be before routes
-app.use(session({
-  cookie: {
-    maxAge: 86400000,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-  },
-  store: new MemoryStore({
-    checkPeriod: 86400000 
-  }),
-  resave: false,
-  saveUninitialized: false,
-  secret: process.env.SESSION_SECRET || "wak-dashboard-secret"
-}));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -120,8 +104,28 @@ app.use((req, res, next) => {
 (async () => {
   validateStartupEnv();
 
-  // Run pending migrations before starting up (inline so esbuild bundles them)
+  // Import the DB pool and wire up persistent session storage.
+  // connect-pg-simple stores sessions in PostgreSQL so they survive server restarts.
+  // MemoryStore (previous) wiped sessions on every Railway deploy, causing 401s.
   const { pool } = await import("./db");
+
+  app.use(session({
+    cookie: {
+      maxAge: 86400000,  // 24 hours
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    },
+    store: new PgSession({
+      pool,
+      tableName: 'sessions',
+      createTableIfMissing: true,
+    }),
+    resave: false,
+    saveUninitialized: false,
+    secret: process.env.SESSION_SECRET || "wak-dashboard-secret",
+  }));
+
   try {
     await pool.query(`
       ALTER TABLE messages
