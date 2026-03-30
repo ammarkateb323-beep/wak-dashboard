@@ -492,6 +492,22 @@ export async function registerRoutes(
     res.json(messages);
   });
 
+  app.get('/api/voice-notes/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT audio_data, mime_type FROM voice_notes WHERE id = $1::uuid',
+      [id],
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ message: 'Voice note not found' });
+      return;
+    }
+    const { audio_data, mime_type } = result.rows[0];
+    res.setHeader('Content-Type', mime_type || 'audio/ogg');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.send(audio_data);
+  });
+
   app.post(api.messages.send.path, requireAuth, async (req, res) => {
     try {
       const data = api.messages.send.input.parse(req.body);
