@@ -1,6 +1,9 @@
 import crypto from 'crypto';
 import { pool } from './db';
 import { z } from 'zod';
+import { createLogger } from './lib/logger';
+
+const logger = createLogger('surveys');
 
 // ── Migration + seed (runs on startup, fully idempotent) ─────────────────────
 
@@ -118,10 +121,10 @@ export async function sendSurveyToCustomer(
           'x-webhook-secret': process.env.WEBHOOK_SECRET || '',
         },
         body: JSON.stringify({ customer_phone: customerPhone, message }),
-      }).catch((e: any) => console.error('[survey] WhatsApp send error:', e));
+      }).catch((e: any) => logger.error('Survey WhatsApp send failed', e.message));
     }
   } catch (e: any) {
-    console.error('[survey] sendSurveyToCustomer error:', e);
+    logger.error('sendSurveyToCustomer failed', e.message);
   }
 }
 

@@ -1,0 +1,155 @@
+/**
+ * messages.routes.ts — Message and voice note routes.
+ *
+ * Handles: get conversation history, stream voice notes,
+ * send a message from the dashboard, and receive incoming-message
+ * webhook notifications from the Python bot.
+ */
+
+import type { Express } from 'express';
+
+import { pool } from '../db';
+import { storage } from '../storage';
+import { requireAuth, requireWebhookSecret } from '../middleware/auth';
+import { notifyAgent, notifyAll, notifiedChats } from '../push';
+import { createLogger, maskPhone } from '../lib/logger';
+import { api } from '@shared/routes';
+
+const logger = createLogger('messages');
+
+export function registerMessageRoutes(app: Express): void {
+
+  // GET /api/messages/:phone — conversation history
+  app.get(api.messages.list.path, requireAuth, async (req: any, res: any) => {
+    const phone = req.params.phone;
+    try {
+      const messages = await storage.getMessages(phone);
+      res.json(messages);
+    } catch (err: any) {
+      logger.error('getMessages failed', `phone: ${maskPhone(phone)}, error: ${err.message}`);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/voice-notes/:id — stream stored audio (authenticated)
+  app.get('/api/voice-notes/:id', requireAuth, async (req: any, res: any) => {
+    const { id } = req.params;
+    try {
+      const result = await pool.query(
+        'SELECT audio_data, mime_type FROM voice_notes WHERE id = $1::uuid',
+        [id]
+      );
+      if (result.rows.length === 0) {
+        logger.warn('Voice note not found', `id: ${id}`);
+        res.status(404).json({ message: 'Voice note not found' });
+        return;
+      }
+      const { audio_data, mime_type } = result.rows[0];
+      res.setHeader('Content-Type', mime_type || 'audio/ogg');
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      res.send(audio_data);
+    } catch (err: any) {
+      logger.error('getVoiceNote failed', `id: ${id}, error: ${err.message}`);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // POST /api/send — agent sends a message from the dashboard
+  app.post(api.messages.send.path, requireAuth, async (req: any, res: any) => {
+    try {
+      const data = api.messages.send.input.parse(req.body);
+      logger.info(
+        'Agent message send requested',
+        `phone: ${maskPhone(data.customer_phone)}, type: text`
+      );
+
+      if (process.env.N8N_SEND_WEBHOOK) {
+        const response = await fetch(process.env.N8N_SEND_WEBHOOK, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-webhook-secret': process.env.WEBHOOK_SECRET || '',
+          },
+          body: JSON.stringify({
+            customer_phone: data.customer_phone,
+            message: data.message,
+          }),
+        });
+        if (!response.ok) {
+          logger.error(
+            'Message delivery failed',
+            `phone: ${maskPhone(data.customer_phone)}, status: ${response.status}`
+          );
+          throw new Error('Failed to deliver message');
+        }
+        logger.info(
+          'Agent message delivered',
+          `phone: ${maskPhone(data.customer_phone)}, type: text`
+        );
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      logger.error('send failed', err.message);
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  // POST /api/incoming — webhook from Python bot (new inbound customer message)
+  app.post(api.messages.incoming.path, requireWebhookSecret, async (req: any, res: any) => {
+    try {
+      const data = api.messages.incoming.input.parse(req.body);
+      logger.info(
+        'Inbound message received from bot',
+        `phone: ${maskPhone(data.customer_phone)}, type: text`
+      );
+
+      // Look up whether this chat is assigned to a specific agent.
+      const escRow = await pool.query(
+        `SELECT assigned_agent_id FROM escalations
+         WHERE customer_phone=$1 AND status IN ('open','in_progress')
+         ORDER BY created_at DESC LIMIT 1`,
+        [data.customer_phone]
+      );
+      const assignedAgentId: number | null = escRow.rows[0]?.assigned_agent_id ?? null;
+
+      if (assignedAgentId) {
+        const key = `${assignedAgentId}:${data.customer_phone}`;
+        if (!notifiedChats.has(key)) {
+          notifiedChats.add(key);
+          await notifyAgent(assignedAgentId, {
+            title: 'New message',
+            body: `${maskPhone(data.customer_phone)}: ${data.message_text.substring(0, 60)}`,
+            url: '/inbox',
+            data: { phone: data.customer_phone },
+          });
+        }
+      } else {
+        const key = `all:${data.customer_phone}`;
+        if (!notifiedChats.has(key)) {
+          notifiedChats.add(key);
+          await notifyAll({
+            title: 'New customer waiting',
+            body: `${maskPhone(data.customer_phone)} is waiting — tap to claim`,
+            url: '/inbox',
+            data: { phone: data.customer_phone },
+          });
+        }
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      logger.error('incoming webhook failed', err.message);
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  // POST /api/notifications/mark-read/:phone — clear notification dedup flag
+  app.post('/api/notifications/mark-read/:phone', requireAuth, (req: any, res: any) => {
+    const agentId = req.session.agentId as number;
+    const phone = decodeURIComponent(req.params.phone);
+    notifiedChats.delete(`${agentId}:${phone}`);
+    notifiedChats.delete(`all:${phone}`);
+    res.json({ success: true });
+  });
+}

@@ -1,0 +1,44 @@
+/**
+ * auth.ts — shared Express authentication middleware.
+ *
+ * Extracted from routes.ts so all route modules can import the same
+ * requireAuth / requireAdmin / requireWebhookSecret functions without
+ * receiving them as parameters or re-defining them.
+ */
+
+import type { Request, Response, NextFunction } from 'express';
+
+/** Reject requests from unauthenticated sessions. */
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  if (!req.session.authenticated) {
+    res.status(401).json({ message: 'Unauthorized' });
+    return;
+  }
+  next();
+}
+
+/** Reject requests from non-admin sessions. */
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (!req.session.authenticated) {
+    res.status(401).json({ message: 'Unauthorized' });
+    return;
+  }
+  if (req.session.role !== 'admin') {
+    res.status(403).json({ message: 'Admin access required' });
+    return;
+  }
+  next();
+}
+
+/**
+ * Reject requests that don't carry the correct x-webhook-secret header.
+ * Used on routes called by the Python bot to prevent unauthorised writes.
+ */
+export function requireWebhookSecret(req: Request, res: Response, next: NextFunction): void {
+  const secret = req.headers['x-webhook-secret'];
+  if (secret !== process.env.WEBHOOK_SECRET) {
+    res.status(401).json({ message: 'Invalid webhook secret' });
+    return;
+  }
+  next();
+}

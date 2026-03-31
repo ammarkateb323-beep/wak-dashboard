@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { pool } from './db';
+import { createLogger } from './lib/logger';
+
+const logger = createLogger('agents');
 
 // ── Schema migration + default admin seed ─────────────────────────────────────
 
@@ -36,7 +39,7 @@ export async function ensureAgentsTable(): Promise<void> {
       `INSERT INTO agents (name, email, password_hash, role) VALUES ($1, $2, $3, 'admin')`,
       ['Admin', 'admin@wak-solutions.com', hash]
     );
-    console.log('[agents] Default admin created: admin@wak-solutions.com');
+    logger.info('Default admin seeded', 'email: admin@wak-solutions.com');
   }
 }
 
@@ -136,9 +139,11 @@ export function registerAgentRoutes(app: any, requireAdmin: any, requireAuth: an
          RETURNING id, name, email, role, is_active, created_at`,
         [name, email, hash, role]
       );
+      logger.info('Agent created', `agentId: ${result.rows[0].id}, role: ${role}`);
       res.status(201).json(result.rows[0]);
     } catch (err: any) {
       if (err.code === '23505') return res.status(409).json({ message: 'Email already in use.' });
+      logger.error('createAgent failed', err.message);
       res.status(400).json({ message: err.message });
     }
   });
@@ -182,8 +187,10 @@ export function registerAgentRoutes(app: any, requireAdmin: any, requireAuth: an
         }
       }
       await pool.query(`UPDATE agents SET is_active=false WHERE id=$1`, [id]);
+      logger.info('Agent deactivated', `agentId: ${id}`);
       res.json({ success: true });
     } catch (err: any) {
+      logger.error('deactivateAgent failed', `agentId: ${id}, error: ${err.message}`);
       res.status(500).json({ message: err.message });
     }
   });

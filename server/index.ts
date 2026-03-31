@@ -51,8 +51,15 @@ export function log(message: string, source = "express") {
     second: "2-digit",
     hour12: true,
   });
-
   console.log(`${formattedTime} [${source}] ${message}`);
+}
+
+// Structured logger used by the request pipeline and error handler.
+// Route modules use createLogger() from lib/logger.ts directly.
+function slog(level: string, module: string, message: string, context?: string) {
+  const line = context ? `${message} — ${context}` : message;
+  const fn = level === 'ERROR' ? console.error : console.log;
+  fn(`[${level}] [${module}] ${line}`);
 }
 
 function validateStartupEnv() {
@@ -111,7 +118,7 @@ app.use((req, res, next) => {
 
   app.use(session({
     cookie: {
-      maxAge: 86400000,  // 24 hours
+      maxAge: 7 * 24 * 60 * 60 * 1000,  // 7 days, rolling
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
@@ -121,6 +128,7 @@ app.use((req, res, next) => {
       tableName: 'session',
       createTableIfMissing: true,
     }),
+    rolling: true,          // reset expiry on every request
     resave: false,
     saveUninitialized: false,
     secret: process.env.SESSION_SECRET || "wak-dashboard-secret",
@@ -138,7 +146,7 @@ app.use((req, res, next) => {
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
     `);
   } catch (err) {
-    log(`Session table migration error (continuing): ${err}`, "db");
+    slog('WARN', 'db', 'Session table migration error (continuing)', String(err));
   }
 
   try {
@@ -164,9 +172,9 @@ app.use((req, res, next) => {
       );
       CREATE INDEX IF NOT EXISTS contacts_phone_idx ON contacts (phone_number);
     `);
-    log("Migrations applied successfully", "db");
+    slog('INFO', 'db', 'Startup migrations applied successfully');
   } catch (err) {
-    log(`Migration error (continuing): ${err}`, "db");
+    slog('WARN', 'db', 'Migration error (continuing)', String(err));
   }
 
   const [{ registerRoutes }, { serveStatic }] = await Promise.all([
@@ -176,11 +184,12 @@ app.use((req, res, next) => {
 
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    console.error("Internal Server Error:", err);
+    slog('ERROR', 'express', 'Unhandled error', `method: ${req.method}, path: ${req.path}, status: ${status}, error: ${message}`);
+    if (process.env.NODE_ENV !== 'production') console.error(err);
 
     if (res.headersSent) {
       return next(err);
