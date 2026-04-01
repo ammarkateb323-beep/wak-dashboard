@@ -55,7 +55,7 @@ export function useLogin() {
 
 export function useLogout() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async () => {
       const res = await fetch(api.auth.logout.path, {
@@ -66,7 +66,7 @@ export function useLogout() {
       return api.auth.logout.responses[200].parse(await res.json());
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
+      queryClient.clear();
     },
   });
 }
