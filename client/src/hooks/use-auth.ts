@@ -66,7 +66,18 @@ export function useLogout() {
       return api.auth.logout.responses[200].parse(await res.json());
     },
     onSuccess: () => {
-      queryClient.clear();
+      // Set auth state to unauthenticated before clearing other queries.
+      // This gives the Login page a cache hit on /api/me so it never
+      // re-fires the request against the now-invalid session.
+      queryClient.setQueryData([api.auth.me.path], {
+        authenticated: false,
+        role: undefined,
+        agentId: null,
+        agentName: undefined,
+      });
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] !== api.auth.me.path,
+      });
     },
   });
 }
