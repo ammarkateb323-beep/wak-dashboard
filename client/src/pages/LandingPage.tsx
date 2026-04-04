@@ -770,6 +770,13 @@ export default function LandingPage() {
 
       {/* Interactive product demo overlay */}
       <ProductDemo open={demoOpen} onClose={() => setDemoOpen(false)} />
+
+      {/* Dev login bypass */}
+      <Link href="/login">
+        <a style={{ position: "fixed", bottom: 16, left: 16, fontSize: 11, color: "#aaa", textDecoration: "none" }}>
+          Dev access
+        </a>
+      </Link>
     </div>
   );
 }
