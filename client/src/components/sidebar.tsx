@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { MessageSquare, Inbox } from "lucide-react";
+import { isToday, isYesterday, format } from "date-fns";
+import { MessageSquare, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
 import type { Conversation } from "@shared/schema";
 
-type Filter = "all" | "open" | "closed";
+type FilterType = "all" | "open" | "closed";
 
 interface SidebarProps {
   conversations: Conversation[];
@@ -13,46 +13,103 @@ interface SidebarProps {
   onSelect: (phone: string) => void;
 }
 
+/* ────────────────────────────────────────────────────────────
+   WhatsApp-style time formatting — "10:32 AM", "Yesterday", "3/28/26"
+   ──────────────────────────────────────────────────────────── */
+function formatConversationTime(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (isToday(date)) return format(date, "h:mm a");
+  if (isYesterday(date)) return "Yesterday";
+  return format(date, "M/d/yy");
+}
+
+/* ────────────────────────────────────────────────────────────
+   Avatar colors — consistent color per phone number
+   ──────────────────────────────────────────────────────────── */
+const AVATAR_COLORS = [
+  "#00a884", "#008069", "#25D366", "#075E54",
+  "#128C7E", "#34B7F1", "#7C94B6", "#546E7A",
+];
+
+function getAvatarColor(phone: string): string {
+  let hash = 0;
+  for (let i = 0; i < phone.length; i++) hash = phone.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getInitials(phone: string): string {
+  // Use first 2 digits after country code, or last 2 digits
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length >= 4) return digits.slice(-4, -2);
+  return digits.slice(-2);
+}
+
+/* ════════════════════════════════════════════════════════════
+   MAIN EXPORT — Sidebar (WhatsApp Web conversation list)
+   ════════════════════════════════════════════════════════════ */
 export function Sidebar({ conversations, selectedPhone, onSelect }: SidebarProps) {
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const { t } = useLanguage();
 
   const activeConversations = conversations.filter(c => c.escalation_status !== "closed");
-  const visible =
+  const filteredByStatus =
     filter === "all" ? conversations :
     filter === "open" ? activeConversations :
     conversations.filter(c => c.escalation_status === "closed");
 
-  const tabs: { key: Filter; label: string }[] = [
+  // Search filter
+  const visible = searchQuery.trim()
+    ? filteredByStatus.filter(c =>
+        c.customer_phone.includes(searchQuery) ||
+        (c.last_message && c.last_message.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : filteredByStatus;
+
+  const tabs: { key: FilterType; label: string }[] = [
     { key: "all", label: t("sidebarFilterAll") },
     { key: "open", label: t("sidebarFilterActive") },
     { key: "closed", label: t("sidebarFilterResolved") },
   ];
 
   return (
-    <div className="w-full md:w-80 h-full bg-white border-e border-gray-200 flex flex-col z-10">
-      {/* Header */}
-      <div className="px-4 py-3.5 border-b border-gray-100 bg-gray-50/80">
-        <div className="flex items-center gap-2.5">
-          <Inbox className="w-4 h-4 text-[#0F510F]" />
-          <div>
-            <span className="text-sm font-semibold text-gray-800">{t("sidebarInbox")}</span>
-            <span className="text-gray-400 font-normal text-xs"> · {activeConversations.length} {t("sidebarActiveConversations")}</span>
-          </div>
+    <div className="w-full md:w-80 h-full bg-white border-e border-[#E9EDEF] flex flex-col z-10">
+      {/* ─── Header — WhatsApp Web style ─── */}
+      <div className="px-4 py-3 bg-[#F0F2F5] flex items-center justify-between shrink-0">
+        <span className="text-[15px] font-bold text-[#111b21] tracking-tight">{t("sidebarInbox")}</span>
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] font-medium text-[#00a884] bg-[#00a884]/10 px-2 py-0.5 rounded-full">
+            {activeConversations.length} {t("sidebarActiveLabel")}
+          </span>
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex border-b border-gray-100 px-1">
+      {/* ─── Search bar ─── */}
+      <div className="px-2 py-1.5 bg-white border-b border-[#E9EDEF]">
+        <div className="flex items-center bg-[#F0F2F5] rounded-lg px-3 py-1.5 gap-2">
+          <Search className="w-4 h-4 text-[#54656f] shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder={t("sidebarSearchPlaceholder")}
+            className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-[13px] text-[#111b21] placeholder:text-[#667781]"
+          />
+        </div>
+      </div>
+
+      {/* ─── Filter tabs ─── */}
+      <div className="flex border-b border-[#E9EDEF] px-2 bg-white">
         {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setFilter(tab.key)}
             className={cn(
-              "flex-1 py-2.5 text-xs font-medium transition-colors",
+              "flex-1 py-2 text-[12px] font-medium transition-colors",
               filter === tab.key
-                ? "text-[#0F510F] border-b-2 border-[#0F510F]"
-                : "text-gray-400 hover:text-gray-600"
+                ? "text-[#00a884] border-b-2 border-[#00a884]"
+                : "text-[#54656f] hover:text-[#111b21]"
             )}
           >
             {tab.label}
@@ -60,12 +117,12 @@ export function Sidebar({ conversations, selectedPhone, onSelect }: SidebarProps
         ))}
       </div>
 
-      {/* Conversations */}
+      {/* ─── Conversation list ─── */}
       <div className="flex-1 overflow-y-auto">
         {visible.length === 0 ? (
-          <div className="p-4 text-center text-gray-400 text-sm mt-10">
-            <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-20" />
-            {t("sidebarNoConversations")}
+          <div className="p-6 text-center text-[#667781] text-sm mt-10">
+            <MessageSquare className="w-10 h-10 mx-auto mb-3 text-[#667781]/30" />
+            <p className="text-[13px]">{t("sidebarNoConversations")}</p>
           </div>
         ) : (
           visible.map(conv => (
@@ -82,44 +139,69 @@ export function Sidebar({ conversations, selectedPhone, onSelect }: SidebarProps
   );
 }
 
-function ConversationItem({ conversation, isSelected, onClick }: { conversation: Conversation; isSelected: boolean; onClick: () => void }) {
-  const timeAgo = conversation.last_message_at
-    ? formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })
-    : "";
+/* ────────────────────────────────────────────────────────────
+   ConversationItem — WhatsApp Web row style
+   ──────────────────────────────────────────────────────────── */
+function ConversationItem({
+  conversation,
+  isSelected,
+  onClick,
+}: {
+  conversation: Conversation;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
   const isOpen = conversation.escalation_status !== "closed";
-
-  // Mask phone: +966 5** ***4821
   const phone = conversation.customer_phone;
-  const masked = phone.length >= 8
-    ? phone.slice(0, -4).replace(/\d(?=.*\d{4})/g, "*").slice(0, -4) + " " + phone.slice(-4)
-    : phone;
+  const initials = getInitials(phone);
+  const avatarColor = getAvatarColor(phone);
+  const timeLabel = formatConversationTime(conversation.last_message_at);
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        "w-full text-start px-4 py-3 border-b border-gray-50 hover:bg-gray-50/80 transition-colors",
-        isSelected
-          ? "bg-[#0F510F]/[0.06] border-s-[3px] border-[#0F510F]"
-          : ""
+        "w-full text-start flex items-center gap-3 px-3 py-3 border-b border-[#E9EDEF]/60 hover:bg-[#F0F2F5] transition-colors",
+        isSelected && "bg-[#F0F2F5]"
       )}
     >
-      <div className="flex items-center justify-between mb-0.5">
-        <span className={cn(
-          "text-sm font-bold truncate",
-          isSelected ? "text-[#0F510F]" : "text-gray-900"
-        )}>
-          {conversation.customer_phone}
-        </span>
-        <div className="flex items-center gap-1.5 shrink-0 ms-2">
-          <span className="text-xs text-gray-400">{timeAgo}</span>
+      {/* Avatar circle */}
+      <div
+        className="w-[49px] h-[49px] rounded-full flex items-center justify-center shrink-0"
+        style={{ backgroundColor: avatarColor }}
+      >
+        <span className="text-[16px] font-bold text-white">{initials}</span>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        {/* Top row: name + time */}
+        <div className="flex items-center justify-between mb-0.5">
+          <span className={cn(
+            "text-[15px] font-normal truncate",
+            isSelected ? "text-[#111b21]" : "text-[#111b21]"
+          )}>
+            {phone}
+          </span>
+          <span className={cn(
+            "text-[12px] shrink-0 ml-2",
+            isOpen && !isSelected ? "text-[#25D366] font-medium" : "text-[#667781]"
+          )}>
+            {timeLabel}
+          </span>
+        </div>
+        {/* Bottom row: last message + unread badge */}
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] text-[#667781] truncate pr-2">
+            {conversation.last_message || ""}
+          </span>
           {isOpen && !isSelected && (
-            <span className="w-2 h-2 rounded-full bg-[#0F510F]" />
+            <span className="w-[18px] h-[18px] rounded-full bg-[#25D366] flex items-center justify-center shrink-0">
+              <span className="text-[10px] font-bold text-white leading-none">1</span>
+            </span>
           )}
         </div>
       </div>
-      <div className="text-xs text-gray-500 truncate mt-0.5">{conversation.last_message}</div>
-      <div className="text-[10px] text-gray-400 mt-1">{masked}</div>
     </button>
   );
 }
