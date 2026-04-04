@@ -91,6 +91,10 @@ function ActiveChat({ conversation, onClose }: { conversation: Conversation; onC
 
   const isOpen = conversation.escalation_status !== "closed";
 
+  // Build initials for avatar: use first 2 chars of phone if starts with +, else last 2 digits
+  const phoneStr = conversation.customer_phone;
+  const avatarInitials = phoneStr.startsWith("+") ? phoneStr.slice(1, 3) : phoneStr.slice(-2);
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#F0EDE8] relative">
       {/* Header */}
@@ -99,15 +103,12 @@ function ActiveChat({ conversation, onClose }: { conversation: Conversation; onC
           <button onClick={onClose} className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">
             <ArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
-          <div className="w-8 h-8 rounded-full bg-[#0F510F]/10 flex items-center justify-center">
-            <span className="text-xs font-bold text-[#0F510F]">{conversation.customer_phone.slice(-2)}</span>
+          <div className="w-10 h-10 rounded-full bg-[#0F510F]/10 flex items-center justify-center">
+            <span className="text-sm font-bold text-[#0F510F]">{avatarInitials}</span>
           </div>
           <div>
             <div className="text-sm font-semibold text-gray-800">{conversation.customer_phone}</div>
-            <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
-              <span className={cn("w-1.5 h-1.5 rounded-full", isOpen ? "bg-green-500" : "bg-gray-400")} />
-              {isOpen ? t("chatStatusActive") : t("chatStatusResolved")}
-            </div>
+            <div className="text-xs text-gray-400">{conversation.customer_phone}</div>
           </div>
         </div>
 
@@ -226,14 +227,13 @@ function VoiceNoteBubble({ message, isCustomer }: { message: Message; isCustomer
 
   return (
     <div className={cn(
-      "px-3 py-2 rounded-xl shadow-sm min-w-[220px] max-w-full",
-      isCustomer ? "bg-white text-gray-800" : "bg-gray-100 text-gray-800 border border-gray-200"
+      "px-3 py-2 rounded-xl min-w-[220px] max-w-full",
+      isCustomer
+        ? "bg-white border border-gray-100 shadow-sm text-gray-800"
+        : "bg-gray-100 text-gray-800"
     )}>
       <div className="flex items-center gap-2 mb-2">
-        <div className={cn(
-          "w-7 h-7 rounded-full flex items-center justify-center shrink-0",
-          isCustomer ? "bg-[#0F510F]/10" : "bg-[#0F510F]/10"
-        )}>
+        <div className="w-7 h-7 rounded-full bg-[#0F510F]/10 flex items-center justify-center shrink-0">
           <Mic className="w-3.5 h-3.5 text-[#0F510F]" />
         </div>
         <span className="text-[10px] font-semibold text-gray-500">{t("voiceNote")}</span>
@@ -267,11 +267,11 @@ function MessageBubble({ message }: { message: Message }) {
           <VoiceNoteBubble message={message} isCustomer={isCustomer} />
         ) : (
           <div className={cn(
-            "px-3 py-2 rounded-xl shadow-sm text-[13px] leading-relaxed",
+            "px-3 py-2 rounded-xl text-[13px] leading-relaxed",
             isCustomer
-              ? "bg-white text-gray-800"
+              ? "bg-white border border-gray-100 shadow-sm text-gray-800"
               : isAI
-                ? "bg-gray-100 text-gray-800 border border-gray-200"
+                ? "bg-gray-100 text-gray-800"
                 : "bg-[#DCF8C6] text-gray-800"
           )}>
             {!isCustomer && (

@@ -3,18 +3,18 @@ import { useLocation } from "wouter";
 import {
   Search, MessageSquare, Bot, HeadphonesIcon,
   AlertTriangle, Calendar, CheckCircle2, ClipboardList,
-  ClipboardCheck, Package, ChevronLeft, ChevronRight, X,
-  Users2, BarChart3,
+  ClipboardCheck, Package, ChevronLeft, ChevronRight,
+  Users2, BarChart3, ArrowLeft,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
 } from "recharts";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/lib/language-context";
 import DashboardLayout from "@/components/DashboardLayout";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// -- Types --------------------------------------------------------------------
 
 interface CustomerRow {
   phone: string;
@@ -42,131 +42,35 @@ interface JourneyData {
 
 interface FunnelStage { stage: string; count: number; }
 
-// ── Event config (icon + colours) ────────────────────────────────────────────
+// -- Event config (icon + colours) --------------------------------------------
 
 const EVENT_CONFIG: Record<
   TimelineEvent["type"],
-  { icon: React.ReactNode; bg: string; text: string; border: string }
+  { icon: React.ReactNode; bg: string; text: string; ring: string }
 > = {
-  first_contact:      { icon: <MessageSquare className="w-3.5 h-3.5" />, bg: "bg-blue-100",   text: "text-blue-600",   border: "border-blue-200"   },
-  bot_message:        { icon: <Bot            className="w-3.5 h-3.5" />, bg: "bg-gray-100",   text: "text-gray-500",   border: "border-gray-200"   },
-  agent_message:      { icon: <HeadphonesIcon className="w-3.5 h-3.5" />, bg: "bg-purple-100", text: "text-purple-600", border: "border-purple-200" },
-  escalation:         { icon: <AlertTriangle  className="w-3.5 h-3.5" />, bg: "bg-orange-100", text: "text-orange-600", border: "border-orange-200" },
-  meeting_booked:     { icon: <Calendar       className="w-3.5 h-3.5" />, bg: "bg-teal-100",   text: "text-teal-600",   border: "border-teal-200"   },
-  meeting_completed:  { icon: <CheckCircle2   className="w-3.5 h-3.5" />, bg: "bg-green-100",  text: "text-green-600",  border: "border-green-200"  },
-  survey_sent:        { icon: <ClipboardList  className="w-3.5 h-3.5" />, bg: "bg-yellow-100", text: "text-yellow-600", border: "border-yellow-200" },
-  survey_submitted:   { icon: <ClipboardCheck className="w-3.5 h-3.5" />, bg: "bg-green-100",  text: "text-green-600",  border: "border-green-200"  },
-  order:              { icon: <Package        className="w-3.5 h-3.5" />, bg: "bg-indigo-100", text: "text-indigo-600", border: "border-indigo-200" },
+  first_contact:      { icon: <MessageSquare className="w-3.5 h-3.5" />, bg: "bg-blue-100",   text: "text-blue-600",   ring: "ring-blue-200"   },
+  bot_message:        { icon: <Bot            className="w-3.5 h-3.5" />, bg: "bg-gray-100",   text: "text-gray-500",   ring: "ring-gray-200"   },
+  agent_message:      { icon: <HeadphonesIcon className="w-3.5 h-3.5" />, bg: "bg-purple-100", text: "text-purple-600", ring: "ring-purple-200" },
+  escalation:         { icon: <AlertTriangle  className="w-3.5 h-3.5" />, bg: "bg-orange-100", text: "text-orange-600", ring: "ring-orange-200" },
+  meeting_booked:     { icon: <Calendar       className="w-3.5 h-3.5" />, bg: "bg-teal-100",   text: "text-teal-600",   ring: "ring-teal-200"   },
+  meeting_completed:  { icon: <CheckCircle2   className="w-3.5 h-3.5" />, bg: "bg-green-100",  text: "text-green-600",  ring: "ring-green-200"  },
+  survey_sent:        { icon: <ClipboardList  className="w-3.5 h-3.5" />, bg: "bg-yellow-100", text: "text-yellow-600", ring: "ring-yellow-200" },
+  survey_submitted:   { icon: <ClipboardCheck className="w-3.5 h-3.5" />, bg: "bg-green-100",  text: "text-green-600",  ring: "ring-green-200"  },
+  order:              { icon: <Package        className="w-3.5 h-3.5" />, bg: "bg-indigo-100", text: "text-indigo-600", ring: "ring-indigo-200" },
 };
 
-// Funnel bar colours: green → yellow → orange → red (top → bottom of funnel)
+// Funnel bar colours
 const FUNNEL_COLORS = ["#16a34a", "#65a30d", "#d97706", "#ea580c", "#dc2626"];
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
-function TimelineRow({ event }: { event: TimelineEvent }) {
-  const cfg = EVENT_CONFIG[event.type];
-  return (
-    <div className="flex gap-3 items-start">
-      {/* Icon */}
-      <div className={`mt-0.5 w-7 h-7 rounded-full ${cfg.bg} ${cfg.text} flex items-center justify-center flex-shrink-0`}>
-        {cfg.icon}
-      </div>
-      {/* Content */}
-      <div className="flex-1 min-w-0 pb-4 border-b border-gray-200/40 last:border-0 last:pb-0">
-        <p className="text-sm font-medium text-gray-900 leading-snug">{event.summary}</p>
-        <p className="text-xs text-gray-500 mt-0.5">
-          {format(new Date(event.timestamp), "MMM d, yyyy · h:mm a")}
-        </p>
-      </div>
-    </div>
-  );
+/** Mask a phone number: show only last 4 digits */
+function maskPhone(phone: string): string {
+  if (phone.length <= 4) return phone;
+  return "****" + phone.slice(-4);
 }
 
-function JourneyPanel({
-  phone,
-  onClose,
-}: {
-  phone: string;
-  onClose: () => void;
-}) {
-  const { t } = useLanguage();
-  const [data, setData] = useState<JourneyData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    fetch(`/api/customers/${encodeURIComponent(phone)}/journey`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [phone]);
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-white shadow-2xl flex flex-col"
-      >
-        {/* Header */}
-        <div className="h-14 bg-[#0F510F] text-white flex items-center gap-3 px-4 flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate">
-              {data?.customer?.name || phone}
-            </p>
-            {data?.customer?.name && (
-              <p className="text-xs text-white/60 font-mono truncate">{phone}</p>
-            )}
-          </div>
-          {data?.customer?.firstSeen && (
-            <p className="text-xs text-white/60 flex-shrink-0 hidden sm:block">
-              {t("journeyFirstSeen")}: {format(new Date(data.customer.firstSeen), "MMM d, yyyy")}
-            </p>
-          )}
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5">
-          {loading ? (
-            <div className="flex justify-center pt-16">
-              <div className="w-6 h-6 border-4 border-[#0F510F]/20 border-t-[#0F510F] rounded-full animate-spin" />
-            </div>
-          ) : !data || data.timeline.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center pt-12">{t("journeyNoEvents")}</p>
-          ) : (
-            <div className="space-y-0">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
-                {data.timeline.length} events
-              </p>
-              {data.timeline.map((evt, i) => (
-                <TimelineRow key={i} event={evt} />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
+// -- Sub-components -----------------------------------------------------------
 
 function FunnelTab() {
   const { t } = useLanguage();
@@ -188,7 +92,6 @@ function FunnelTab() {
     );
   }
 
-  // Annotate with drop-off %
   const annotated = stages.map((s, i) => {
     const prev = i === 0 ? null : stages[i - 1].count;
     const dropOff = prev && prev > 0 ? Math.round((1 - s.count / prev) * 100) : null;
@@ -198,7 +101,7 @@ function FunnelTab() {
   const max = Math.max(...stages.map(s => s.count), 1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <h2 className="text-base font-semibold text-gray-900">{t("funnelTitle")}</h2>
 
       {/* Recharts bar chart */}
@@ -255,7 +158,7 @@ function FunnelTab() {
                     <span className={`text-sm font-medium ${s.dropOff >= 50 ? "text-red-500" : s.dropOff >= 25 ? "text-orange-500" : "text-gray-500"}`}>
                       −{s.dropOff}%
                     </span>
-                  ) : <span className="text-gray-500">—</span>}
+                  ) : <span className="text-gray-500">--</span>}
                 </td>
                 <td className="px-4 py-3">
                   <div className="w-full bg-gray-100 rounded-full h-2">
@@ -277,7 +180,7 @@ function FunnelTab() {
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// -- Main Page ----------------------------------------------------------------
 
 export default function CustomersPage() {
   const [, setLocation] = useLocation();
@@ -292,9 +195,11 @@ export default function CustomersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
+  const [journeyData, setJourneyData] = useState<JourneyData | null>(null);
+  const [journeyLoading, setJourneyLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // All hooks before early returns
+  // Auth guards
   useEffect(() => {
     if (!isAuthLoading && !isAuthenticated) setLocation("/login");
     if (!isAuthLoading && isAuthenticated && !isAdmin) setLocation("/dashboard");
@@ -329,6 +234,19 @@ export default function CustomersPage() {
     if (isAuthenticated && isAdmin) fetchCustomers();
   }, [isAuthenticated, isAdmin, fetchCustomers]);
 
+  // Fetch journey when a customer is selected
+  useEffect(() => {
+    if (!selectedPhone) {
+      setJourneyData(null);
+      return;
+    }
+    setJourneyLoading(true);
+    fetch(`/api/customers/${encodeURIComponent(selectedPhone)}/journey`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setJourneyData(d); setJourneyLoading(false); })
+      .catch(() => { setJourneyData(null); setJourneyLoading(false); });
+  }, [selectedPhone]);
+
   if (isAuthLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -339,144 +257,213 @@ export default function CustomersPage() {
 
   const totalPages = Math.ceil(total / 20);
 
+  // Find the selected customer object for display
+  const selectedCustomer = customers.find(c => c.phone === selectedPhone) ?? null;
+
   return (
-    <DashboardLayout>
-      <div className="h-full overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-6 py-6 space-y-4">
-          {/* Page header */}
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t("customersTitle")}</h1>
-            <p className="text-sm text-gray-500 mt-1">{total} {t("customersTotal")}</p>
-          </div>
+    <DashboardLayout noPadding>
+      <div className="h-full flex flex-col">
+        {/* Two-panel layout */}
+        <div className="flex-1 flex min-h-0">
 
-          {/* Tab bar */}
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
-            {(["list", "funnel"] as const).map(key => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                  tab === key
-                    ? "bg-white shadow-sm text-gray-900"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {key === "list" ? <Users2 className="w-3.5 h-3.5" /> : <BarChart3 className="w-3.5 h-3.5" />}
-                {key === "list" ? t("customersTabList") : t("customersTabFunnel")}
-              </button>
-            ))}
-          </div>
+          {/* ── Left Panel: Customer List ── */}
+          <div
+            className={`
+              w-full md:w-[340px] md:flex-shrink-0 border-e border-gray-200 bg-white flex flex-col
+              ${selectedPhone ? "hidden md:flex" : "flex"}
+            `}
+          >
+            {/* Left panel header */}
+            <div className="px-5 pt-5 pb-3 flex-shrink-0">
+              <h1 className="text-lg font-bold text-gray-900">{t("customersTitle")}</h1>
+              <p className="text-xs text-gray-400 mt-0.5">{total} {t("customersTotal")}</p>
+            </div>
 
-          {tab === "funnel" ? (
-            <FunnelTab />
-          ) : (
-            <>
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder={t("customersSearch")}
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-[#0F510F] transition-colors"
-                />
+            {/* Tab bar */}
+            <div className="px-5 pb-3 flex-shrink-0">
+              <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+                {(["list", "funnel"] as const).map(key => (
+                  <button
+                    key={key}
+                    onClick={() => { setTab(key); if (key === "funnel") setSelectedPhone(null); }}
+                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                      tab === key
+                        ? "bg-white shadow-sm text-gray-900"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {key === "list" ? <Users2 className="w-3.5 h-3.5" /> : <BarChart3 className="w-3.5 h-3.5" />}
+                    {key === "list" ? t("customersTabList") : t("customersTabFunnel")}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              {/* Table */}
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                {loading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <div className="w-6 h-6 border-4 border-[#0F510F]/20 border-t-[#0F510F] rounded-full animate-spin" />
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200 bg-gray-50/50">
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("customersColName")}</th>
-                          <th className="hidden md:table-cell text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("customersColFirstSeen")}</th>
-                          <th className="hidden sm:table-cell text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("customersColLastSeen")}</th>
-                          <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("customersTouchpoints")}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {customers.map(c => (
-                          <tr
-                            key={c.phone}
-                            onClick={() => setSelectedPhone(c.phone)}
-                            className="hover:bg-gray-50/50 cursor-pointer transition-colors"
-                          >
-                            <td className="px-4 py-3">
-                              <p className="font-medium text-gray-900">
-                                {c.name || <span className="text-gray-500 italic text-xs">{t("customersUnknown")}</span>}
-                              </p>
-                              <p className="text-xs text-gray-500 font-mono">{c.phone}</p>
-                            </td>
-                            <td className="hidden md:table-cell px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                              {c.firstSeen ? format(new Date(c.firstSeen), "MMM d, yyyy") : "—"}
-                            </td>
-                            <td className="hidden sm:table-cell px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                              {c.lastSeen
-                                ? formatDistanceToNow(new Date(c.lastSeen), { addSuffix: true })
-                                : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="inline-flex items-center justify-center w-8 h-6 rounded-full bg-[#0F510F]/10 text-[#0F510F] text-xs font-semibold">
-                                {c.touchpoints}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                        {customers.length === 0 && (
-                          <tr>
-                            <td colSpan={4} className="px-4 py-12 text-center text-gray-500 text-sm">
-                              {t("customersNoResults")}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-1">
-                  <p className="text-xs text-gray-500">
-                    Page {page} of {totalPages}
-                  </p>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+            {tab === "list" && (
+              <>
+                {/* Search */}
+                <div className="px-5 pb-3 flex-shrink-0">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder={t("customersSearch")}
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:border-[#0F510F] transition-colors"
+                    />
                   </div>
                 </div>
-              )}
-            </>
-          )}
+
+                {/* Customer list (scrollable) */}
+                <div className="flex-1 overflow-y-auto">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-16">
+                      <div className="w-5 h-5 border-[3px] border-[#0F510F]/20 border-t-[#0F510F] rounded-full animate-spin" />
+                    </div>
+                  ) : customers.length === 0 ? (
+                    <div className="px-5 py-12 text-center text-sm text-gray-500">
+                      {t("customersNoResults")}
+                    </div>
+                  ) : (
+                    <div>
+                      {customers.map(c => {
+                        const isSelected = selectedPhone === c.phone;
+                        return (
+                          <button
+                            key={c.phone}
+                            onClick={() => setSelectedPhone(c.phone)}
+                            className={`w-full text-left px-5 py-3.5 transition-colors ${
+                              isSelected
+                                ? "bg-[#0F510F]/[0.08] border-s-[3px] border-[#0F510F]"
+                                : "hover:bg-gray-50 border-s-[3px] border-transparent"
+                            }`}
+                          >
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {c.name || <span className="text-gray-400 italic font-normal">{t("customersUnknown")}</span>}
+                            </p>
+                            <p className="text-xs text-gray-400 font-mono mt-0.5">{maskPhone(c.phone)}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{c.touchpoints} {t("customersTouchpoints").toLowerCase()}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+                      <p className="text-xs text-gray-400">
+                        {page} / {totalPages}
+                      </p>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setPage(p => Math.max(1, p - 1))}
+                          disabled={page === 1}
+                          className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                          disabled={page === totalPages}
+                          className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* When funnel tab is active, left panel just has the tabs -- nothing else */}
+          </div>
+
+          {/* ── Right Panel ── */}
+          <div
+            className={`
+              flex-1 bg-gray-50 flex flex-col min-w-0
+              ${selectedPhone ? "flex" : "hidden md:flex"}
+            `}
+          >
+            {/* Funnel full-screen view */}
+            {tab === "funnel" ? (
+              <div className="flex-1 overflow-y-auto">
+                <FunnelTab />
+              </div>
+            ) : selectedPhone ? (
+              <>
+                {/* Right panel header */}
+                <div className="flex-shrink-0 bg-white border-b border-gray-200 px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    {/* Mobile back button */}
+                    <button
+                      onClick={() => setSelectedPhone(null)}
+                      className="md:hidden p-1.5 -ms-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-gray-500" />
+                    </button>
+                    <div className="min-w-0">
+                      <h2 className="text-xl font-bold text-gray-900 truncate">
+                        {selectedCustomer?.name || selectedPhone}
+                      </h2>
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        {t("journeyTitle")} — {journeyData?.timeline.length ?? 0} {t("customersTouchpoints").toLowerCase()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timeline content (scrollable) */}
+                <div className="flex-1 overflow-y-auto px-5 py-6">
+                  {journeyLoading ? (
+                    <div className="flex justify-center pt-16">
+                      <div className="w-6 h-6 border-4 border-[#0F510F]/20 border-t-[#0F510F] rounded-full animate-spin" />
+                    </div>
+                  ) : !journeyData || journeyData.timeline.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center pt-16">{t("journeyNoEvents")}</p>
+                  ) : (
+                    <div className="relative">
+                      {/* Vertical connector line */}
+                      <div className="absolute top-3 bottom-3 start-[15px] w-px bg-gray-200" />
+
+                      <div className="space-y-0">
+                        {journeyData.timeline.map((evt, i) => {
+                          const cfg = EVENT_CONFIG[evt.type];
+                          return (
+                            <div key={i} className="relative flex gap-4 pb-5 last:pb-0">
+                              {/* Icon circle overlapping the vertical line */}
+                              <div className={`relative z-10 mt-1 w-[30px] h-[30px] rounded-full ${cfg.bg} ${cfg.text} flex items-center justify-center flex-shrink-0 ring-4 ring-gray-50`}>
+                                {cfg.icon}
+                              </div>
+                              {/* Event card */}
+                              <div className="flex-1 min-w-0 bg-white border border-gray-200 rounded-xl px-5 py-4 hover:shadow-md transition-shadow">
+                                <p className="text-sm font-medium text-gray-900 leading-snug">{evt.summary}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {format(new Date(evt.timestamp), "MMM d, yyyy · h:mm a")}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* Empty state -- no customer selected */
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                <Users2 className="w-10 h-10 mb-3 text-gray-300" />
+                <p className="text-sm font-medium">Select a customer to view their journey</p>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
-
-      {/* Journey side panel */}
-      {selectedPhone && (
-        <JourneyPanel
-          phone={selectedPhone}
-          onClose={() => setSelectedPhone(null)}
-        />
-      )}
     </DashboardLayout>
   );
 }

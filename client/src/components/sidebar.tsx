@@ -32,18 +32,18 @@ export function Sidebar({ conversations, selectedPhone, onSelect }: SidebarProps
   return (
     <div className="w-full md:w-80 h-full bg-white border-e border-gray-200 flex flex-col z-10">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80">
+      <div className="px-4 py-3.5 border-b border-gray-100 bg-gray-50/80">
         <div className="flex items-center gap-2.5">
           <Inbox className="w-4 h-4 text-[#0F510F]" />
           <div>
             <span className="text-sm font-semibold text-gray-800">{t("sidebarInbox")}</span>
-            <span className="text-gray-400 font-normal text-sm"> · {activeConversations.length} {t("sidebarActiveConversations")}</span>
+            <span className="text-gray-400 font-normal text-xs"> · {activeConversations.length} {t("sidebarActiveConversations")}</span>
           </div>
         </div>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex border-b border-gray-100">
+      <div className="flex border-b border-gray-100 px-1">
         {tabs.map(tab => (
           <button
             key={tab.key}
@@ -98,26 +98,28 @@ function ConversationItem({ conversation, isSelected, onClick }: { conversation:
     <button
       onClick={onClick}
       className={cn(
-        "w-full text-start px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors",
-        isSelected && "bg-[#0F510F]/5 border-s-2 border-s-[#0F510F]"
+        "w-full text-start px-4 py-3 border-b border-gray-50 hover:bg-gray-50/80 transition-colors",
+        isSelected
+          ? "bg-[#0F510F]/[0.06] border-s-[3px] border-[#0F510F]"
+          : ""
       )}
     >
       <div className="flex items-center justify-between mb-0.5">
         <span className={cn(
-          "text-sm font-medium truncate",
+          "text-sm font-bold truncate",
           isSelected ? "text-[#0F510F]" : "text-gray-900"
         )}>
           {conversation.customer_phone}
         </span>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] text-gray-400">{timeAgo}</span>
+        <div className="flex items-center gap-1.5 shrink-0 ms-2">
+          <span className="text-xs text-gray-400">{timeAgo}</span>
           {isOpen && !isSelected && (
             <span className="w-2 h-2 rounded-full bg-[#0F510F]" />
           )}
         </div>
       </div>
-      <div className="text-xs text-gray-500 truncate">{conversation.last_message}</div>
-      <div className="text-[10px] text-gray-400 mt-0.5">{masked}</div>
+      <div className="text-xs text-gray-500 truncate mt-0.5">{conversation.last_message}</div>
+      <div className="text-[10px] text-gray-400 mt-1">{masked}</div>
     </button>
   );
 }

@@ -87,6 +87,56 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 const inputCls = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0F510F] placeholder:text-gray-400";
 const textareaCls = `${inputCls} resize-none`;
 
+// ── WhatsApp Preview component ────────────────────────────────────────────────
+
+function WhatsAppPreview({ businessName, greeting }: { businessName: string; greeting: string }) {
+  return (
+    <div>
+      <p className="text-sm font-medium text-gray-500 mb-3">WhatsApp Preview</p>
+      <div className="rounded-2xl overflow-hidden shadow-lg border border-gray-200">
+        {/* Header */}
+        <div className="bg-[#0F510F] px-4 py-3 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-sm">W</span>
+          </div>
+          <div className="min-w-0">
+            <p className="text-white text-sm font-semibold truncate">
+              {businessName || "Your Business"}
+            </p>
+            <p className="text-white/60 text-xs">online</p>
+          </div>
+        </div>
+
+        {/* Chat body */}
+        <div className="bg-[#0d4510] min-h-[300px] px-3 py-4">
+          {/* Chat bubble */}
+          <div className="bg-white/20 rounded-xl p-3 max-w-[90%]">
+            <p className="text-[#90EE90] text-xs font-medium mb-1">AI Assistant</p>
+            <p className="text-white text-sm leading-relaxed">
+              {greeting || "Your greeting message will appear here..."}
+            </p>
+            <p className="text-white/40 text-[10px] text-right mt-1.5">
+              {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          </div>
+        </div>
+
+        {/* Input bar */}
+        <div className="bg-[#0a3a0d] px-3 py-2.5 flex items-center gap-2">
+          <div className="flex-1 bg-white/10 rounded-full px-4 py-2">
+            <p className="text-white/30 text-xs">Type a message...</p>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-[#0F510F] flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Drag-to-reorder hook ───────────────────────────────────────────────────────
 
 function useDraggableList<T>(items: T[], setItems: (v: T[]) => void) {
@@ -454,231 +504,249 @@ export default function ChatbotConfig() {
   return (
     <DashboardLayout>
       <div className="h-full overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 py-6 space-y-5 pb-12">
-          <div className="flex items-center gap-2">
+        <div className="max-w-6xl mx-auto px-6 py-6 pb-12">
+          <div className="flex items-center gap-2 mb-5">
             <Bot className="w-5 h-5 text-[#0F510F]" />
             <h1 className="text-2xl font-bold text-gray-900">{t("chatbotTitle")}</h1>
           </div>
 
-          {/* ── Business Identity ─────────────────────────────────────── */}
-          <SectionCard title={t("chatbotSectionIdentity")}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label={t("chatbotFieldBusinessName")}>
-                <input
-                  className={inputCls}
-                  placeholder={t("chatbotPlaceholderBusinessName")}
-                  value={config.businessName}
-                  onChange={e => set("businessName", e.target.value)}
-                />
-              </Field>
-              <Field label={t("chatbotFieldIndustry")} hint={t("chatbotFieldIndustryHint")}>
-                <input
-                  className={inputCls}
-                  placeholder={t("chatbotPlaceholderIndustry")}
-                  value={config.industry}
-                  onChange={e => set("industry", e.target.value)}
-                />
-              </Field>
-            </div>
-            <Field label={t("chatbotFieldTone")}>
-              <div className="flex gap-2 flex-wrap">
-                {[
-                  { val: "Professional", label: t("chatbotToneProfessional") },
-                  { val: "Friendly",     label: t("chatbotToneFriendly") },
-                  { val: "Formal",       label: t("chatbotToneFormal") },
-                  { val: "Custom",       label: t("chatbotToneCustom") },
-                ].map(({ val, label }) => (
-                  <button
-                    key={val}
-                    onClick={() => set("tone", val)}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                      config.tone === val
-                        ? "bg-[#0F510F] border-[#0F510F] text-white"
-                        : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-[#0F510F]/40"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {config.tone === "Custom" && (
-                <input
-                  className={`${inputCls} mt-2`}
-                  placeholder={t("chatbotPlaceholderToneCustom")}
-                  value={config.customTone}
-                  onChange={e => set("customTone", e.target.value)}
-                />
-              )}
-            </Field>
-          </SectionCard>
+          {/* ── Two-column layout: form + WhatsApp preview ──────────── */}
+          <div className="flex gap-8">
+            {/* ── Left column: config form ──────────────────────────── */}
+            <div className="flex-1 min-w-0 space-y-5">
 
-          {/* ── Conversation Flow ─────────────────────────────────────── */}
-          <SectionCard title={t("chatbotSectionFlow")}>
-            <Field label={t("chatbotFieldGreeting")} hint={t("chatbotFieldGreetingHint")}>
-              <textarea
-                className={textareaCls}
-                rows={3}
-                placeholder={t("chatbotPlaceholderGreeting")}
-                value={config.greeting}
-                onChange={e => set("greeting", e.target.value)}
-              />
-            </Field>
-
-            <Field label={t("chatbotFieldQualification")} hint={t("chatbotFieldQualificationHint")}>
-              <QuestionsEditor
-                questions={config.questions}
-                onChange={v => set("questions", v)}
-              />
-            </Field>
-
-            <Field label={t("chatbotFieldClosing")} hint={t("chatbotFieldClosingHint")}>
-              <textarea
-                className={textareaCls}
-                rows={2}
-                placeholder={t("chatbotPlaceholderClosing")}
-                value={config.closingMessage}
-                onChange={e => set("closingMessage", e.target.value)}
-              />
-            </Field>
-          </SectionCard>
-
-          {/* ── Knowledge Base ────────────────────────────────────────── */}
-          <SectionCard title={t("chatbotSectionKnowledge")}>
-            <FaqEditor
-              items={config.faq}
-              onChange={v => set("faq", v)}
-            />
-          </SectionCard>
-
-          {/* ── Escalation Rules ──────────────────────────────────────── */}
-          <SectionCard title={t("chatbotSectionEscalation")}>
-            <p className="text-xs text-gray-500 -mt-2">
-              {t("chatbotEscalationHint")}
-            </p>
-            <EscalationEditor
-              rules={config.escalationRules}
-              onChange={v => set("escalationRules", v)}
-            />
-          </SectionCard>
-
-          {/* ── Advanced: Raw Prompt ──────────────────────────────────── */}
-          <section className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <button
-              onClick={() => { setAdvancedOpen(o => !o); if (!advancedOpen) fetchPreview(); }}
-              className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-gray-900 hover:bg-gray-50/50 transition-colors"
-            >
-              <span>{t("chatbotSectionAdvanced")}</span>
-              {advancedOpen ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-            </button>
-
-            <AnimatePresence initial={false}>
-              {advancedOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <div className="px-5 pb-5 space-y-4 border-t border-gray-200">
-                    {/* Override toggle */}
-                    <div className="flex items-center justify-between pt-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{t("chatbotRawOverrideLabel")}</p>
-                        <p className="text-xs text-gray-500">{t("chatbotRawOverrideHint")}</p>
-                      </div>
+              {/* ── Business Identity ─────────────────────────────────── */}
+              <SectionCard title={t("chatbotSectionIdentity")}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label={t("chatbotFieldBusinessName")}>
+                    <input
+                      className={inputCls}
+                      placeholder={t("chatbotPlaceholderBusinessName")}
+                      value={config.businessName}
+                      onChange={e => set("businessName", e.target.value)}
+                    />
+                  </Field>
+                  <Field label={t("chatbotFieldIndustry")} hint={t("chatbotFieldIndustryHint")}>
+                    <input
+                      className={inputCls}
+                      placeholder={t("chatbotPlaceholderIndustry")}
+                      value={config.industry}
+                      onChange={e => set("industry", e.target.value)}
+                    />
+                  </Field>
+                </div>
+                <Field label={t("chatbotFieldTone")}>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { val: "Professional", label: t("chatbotToneProfessional") },
+                      { val: "Friendly",     label: t("chatbotToneFriendly") },
+                      { val: "Formal",       label: t("chatbotToneFormal") },
+                      { val: "Custom",       label: t("chatbotToneCustom") },
+                    ].map(({ val, label }) => (
                       <button
-                        onClick={() => setOverrideActive(o => !o)}
-                        className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${overrideActive ? "bg-amber-500" : "bg-gray-100"}`}
+                        key={val}
+                        onClick={() => set("tone", val)}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                          config.tone === val
+                            ? "bg-[#0F510F] border-[#0F510F] text-white"
+                            : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-[#0F510F]/40"
+                        }`}
                       >
-                        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${overrideActive ? "translate-x-5" : "translate-x-0.5"}`} />
+                        {label}
                       </button>
-                    </div>
-
-                    {/* Warning banner */}
-                    {overrideActive && (
-                      <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-amber-800">
-                          {t("chatbotRawActiveWarning")}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Compiled preview (when override is off) */}
-                    {!overrideActive && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>{t("chatbotCompiledPreview")}</span>
-                          {previewLoading && <span className="animate-pulse">{t("chatbotUpdating")}</span>}
-                        </div>
-                        <textarea
-                          readOnly
-                          rows={14}
-                          className={`${textareaCls} font-mono text-xs bg-gray-50/50 cursor-default`}
-                          value={previewPrompt ?? ""}
-                        />
-                      </div>
-                    )}
-
-                    {/* Raw editor (when override is on) */}
-                    {overrideActive && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <EyeOff className="w-3.5 h-3.5" />
-                          <span>{t("chatbotRawPromptLabel")}</span>
-                        </div>
-                        <textarea
-                          rows={14}
-                          className={`${textareaCls} font-mono text-xs`}
-                          value={rawPrompt}
-                          onChange={e => setRawPrompt(e.target.value)}
-                        />
-                      </div>
-                    )}
+                    ))}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </section>
+                  {config.tone === "Custom" && (
+                    <input
+                      className={`${inputCls} mt-2`}
+                      placeholder={t("chatbotPlaceholderToneCustom")}
+                      value={config.customTone}
+                      onChange={e => set("customTone", e.target.value)}
+                    />
+                  )}
+                </Field>
+              </SectionCard>
 
-          {/* ── Feedback + Actions ────────────────────────────────────── */}
-          <div className="space-y-3">
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
-            )}
-            {success && (
-              <p className="text-sm text-[#0F510F] bg-[#0F510F]/10 border border-[#0F510F]/20 rounded-lg px-3 py-2">{success}</p>
-            )}
+              {/* ── Conversation Flow ─────────────────────────────────── */}
+              <SectionCard title={t("chatbotSectionFlow")}>
+                <Field label={t("chatbotFieldGreeting")} hint={t("chatbotFieldGreetingHint")}>
+                  <textarea
+                    className={textareaCls}
+                    rows={3}
+                    placeholder={t("chatbotPlaceholderGreeting")}
+                    value={config.greeting}
+                    onChange={e => set("greeting", e.target.value)}
+                  />
+                </Field>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-1.5 text-sm font-medium bg-[#0F510F] text-white px-5 py-2.5 rounded-lg hover:bg-[#0d4510] disabled:opacity-60 transition-colors"
-              >
-                {saving ? (
-                  <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />{t("saving")}</>
-                ) : (
-                  <><Save className="w-3.5 h-3.5" />{t("chatbotBtnSave")}</>
+                <Field label={t("chatbotFieldQualification")} hint={t("chatbotFieldQualificationHint")}>
+                  <QuestionsEditor
+                    questions={config.questions}
+                    onChange={v => set("questions", v)}
+                  />
+                </Field>
+
+                <Field label={t("chatbotFieldClosing")} hint={t("chatbotFieldClosingHint")}>
+                  <textarea
+                    className={textareaCls}
+                    rows={2}
+                    placeholder={t("chatbotPlaceholderClosing")}
+                    value={config.closingMessage}
+                    onChange={e => set("closingMessage", e.target.value)}
+                  />
+                </Field>
+              </SectionCard>
+
+              {/* ── Knowledge Base ────────────────────────────────────── */}
+              <SectionCard title={t("chatbotSectionKnowledge")}>
+                <FaqEditor
+                  items={config.faq}
+                  onChange={v => set("faq", v)}
+                />
+              </SectionCard>
+
+              {/* ── Escalation Rules ──────────────────────────────────── */}
+              <SectionCard title={t("chatbotSectionEscalation")}>
+                <p className="text-xs text-gray-500 -mt-2">
+                  {t("chatbotEscalationHint")}
+                </p>
+                <EscalationEditor
+                  rules={config.escalationRules}
+                  onChange={v => set("escalationRules", v)}
+                />
+              </SectionCard>
+
+              {/* ── Advanced: Raw Prompt ──────────────────────────────── */}
+              <section className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => { setAdvancedOpen(o => !o); if (!advancedOpen) fetchPreview(); }}
+                  className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-gray-900 hover:bg-gray-50/50 transition-colors"
+                >
+                  <span>{t("chatbotSectionAdvanced")}</span>
+                  {advancedOpen ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {advancedOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-5 pb-5 space-y-4 border-t border-gray-200">
+                        {/* Override toggle */}
+                        <div className="flex items-center justify-between pt-4">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{t("chatbotRawOverrideLabel")}</p>
+                            <p className="text-xs text-gray-500">{t("chatbotRawOverrideHint")}</p>
+                          </div>
+                          <button
+                            onClick={() => setOverrideActive(o => !o)}
+                            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${overrideActive ? "bg-amber-500" : "bg-gray-100"}`}
+                          >
+                            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${overrideActive ? "translate-x-5" : "translate-x-0.5"}`} />
+                          </button>
+                        </div>
+
+                        {/* Warning banner */}
+                        {overrideActive && (
+                          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-amber-800">
+                              {t("chatbotRawActiveWarning")}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Compiled preview (when override is off) */}
+                        {!overrideActive && (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>{t("chatbotCompiledPreview")}</span>
+                              {previewLoading && <span className="animate-pulse">{t("chatbotUpdating")}</span>}
+                            </div>
+                            <textarea
+                              readOnly
+                              rows={14}
+                              className={`${textareaCls} font-mono text-xs bg-gray-50/50 cursor-default`}
+                              value={previewPrompt ?? ""}
+                            />
+                          </div>
+                        )}
+
+                        {/* Raw editor (when override is on) */}
+                        {overrideActive && (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <EyeOff className="w-3.5 h-3.5" />
+                              <span>{t("chatbotRawPromptLabel")}</span>
+                            </div>
+                            <textarea
+                              rows={14}
+                              className={`${textareaCls} font-mono text-xs`}
+                              value={rawPrompt}
+                              onChange={e => setRawPrompt(e.target.value)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </section>
+
+              {/* ── Feedback + Actions ────────────────────────────────── */}
+              <div className="space-y-3">
+                {error && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
                 )}
-              </button>
+                {success && (
+                  <p className="text-sm text-[#0F510F] bg-[#0F510F]/10 border border-[#0F510F]/20 rounded-lg px-3 py-2">{success}</p>
+                )}
 
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-1.5 text-sm font-medium border border-gray-200 text-gray-500 px-5 py-2.5 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                {t("chatbotBtnReset")}
-              </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex items-center gap-1.5 text-sm font-medium bg-[#0F510F] text-white px-5 py-2.5 rounded-lg hover:bg-[#0d4510] disabled:opacity-60 transition-colors"
+                  >
+                    {saving ? (
+                      <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />{t("saving")}</>
+                    ) : (
+                      <><Save className="w-3.5 h-3.5" />{t("chatbotBtnSave")}</>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleReset}
+                    className="flex items-center gap-1.5 text-sm font-medium border border-gray-200 text-gray-500 px-5 py-2.5 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    {t("chatbotBtnReset")}
+                  </button>
+                </div>
+
+                {savedAt && (
+                  <p className="text-xs text-gray-500">
+                    Last saved: {new Date(savedAt).toLocaleString()}
+                  </p>
+                )}
+              </div>
+
             </div>
 
-            {savedAt && (
-              <p className="text-xs text-gray-500">
-                Last saved: {new Date(savedAt).toLocaleString()}
-              </p>
-            )}
+            {/* ── Right column: WhatsApp Preview (desktop only) ─────── */}
+            <div className="hidden md:block w-[320px] shrink-0">
+              <div className="sticky top-8">
+                <WhatsAppPreview
+                  businessName={config.businessName}
+                  greeting={config.greeting}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

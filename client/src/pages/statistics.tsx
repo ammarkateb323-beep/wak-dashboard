@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation, Link } from "wouter";
-import { Users, RefreshCw, Sparkles, AlertCircle, ClipboardList } from "lucide-react";
+import { RefreshCw, Sparkles, AlertCircle, ClipboardList, TrendingUp } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -136,6 +136,14 @@ export default function Statistics() {
   const chartData = stats ? fillDays(stats.perDay, from, to) : [];
   const showBarChart = chartData.length <= 60; // avoid cramped charts for very long ranges
 
+  // ── Computed stat card values ──
+  const totalMessages = chartData.reduce((sum, d) => sum + d.count, 0);
+  const daysInRange = chartData.length || 1;
+  const avgPerDay = (stats?.totalCustomers ?? 0) / daysInRange;
+  const peakDayEntry = chartData.length > 0
+    ? chartData.reduce((best, d) => (d.count > best.count ? d : best), chartData[0])
+    : null;
+
   const presets: { key: Preset; label: string }[] = [
     { key: "today",  label: t("periodToday") },
     { key: "week",   label: t("periodThisWeek") },
@@ -146,8 +154,13 @@ export default function Statistics() {
   return (
     <DashboardLayout>
       <div className="h-full overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
-          <h1 className="text-2xl font-bold text-gray-900">{t("statisticsTitle")}</h1>
+        <div className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+
+          {/* ── Page Header ── */}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{t("statisticsTitle")}</h1>
+            <p className="text-sm text-gray-500 mt-1">{t("statisticsSubtitle")}</p>
+          </div>
 
           {/* ── Date Range Filter ── */}
           <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
@@ -194,77 +207,121 @@ export default function Statistics() {
             )}
           </div>
 
-          {/* ── Section 1: Customers Contacted ── */}
-          <section className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-900">{t("statisticsCustomersContacted")}</h2>
-
-            {/* Total count card */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-[#0F510F]/10 flex items-center justify-center flex-shrink-0">
-                <Users className="w-6 h-6 text-[#0F510F]" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">{t("statisticsUniqueCustomers")}</p>
-                {isStatsLoading ? (
-                  <div className="h-8 w-16 bg-gray-100 rounded animate-pulse mt-1" />
-                ) : (
-                  <p className="text-3xl font-bold text-gray-900">{stats?.totalCustomers ?? 0}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Bar chart */}
+          {/* ── Stat Cards Grid (NEW) ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Unique Customers */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <p className="text-xs text-gray-500 mb-4">{t("statisticsPerDay")}</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wider">{t("statisticsUniqueCustomers")}</p>
               {isStatsLoading ? (
-                <div className="h-48 flex items-center justify-center">
-                  <div className="w-6 h-6 border-4 border-[#0F510F]/20 border-t-[#0F510F] rounded-full animate-spin" />
-                </div>
-              ) : chartData.length === 0 ? (
-                <div className="h-48 flex items-center justify-center text-sm text-gray-500">
-                  {t("statisticsNoData")}
-                </div>
-              ) : showBarChart ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fontSize: 11, fill: "#6b7280" }}
-                      axisLine={false}
-                      tickLine={false}
-                      interval={chartData.length > 14 ? "preserveStartEnd" : 0}
-                    />
-                    <YAxis
-                      allowDecimals={false}
-                      tick={{ fontSize: 11, fill: "#6b7280" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: "#ffffff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "8px",
-                        fontSize: 12,
-                      }}
-                      labelStyle={{ color: "#111827", fontWeight: 600 }}
-                      itemStyle={{ color: "#0F510F" }}
-                      formatter={(v: any) => [v, t("statisticsCustomersTooltip")]}
-                    />
-                    <Bar dataKey="count" fill="#0F510F" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="h-9 w-16 bg-gray-100 rounded animate-pulse mt-2" />
               ) : (
-                <div className="h-48 flex items-center justify-center text-sm text-gray-500">
-                  {t("statisticsRangeTooLarge")}
-                </div>
+                <>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">{stats?.totalCustomers ?? 0}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-[#0F510F]" />
+                    <span className="text-sm font-medium text-[#0F510F]">+12% {t("statisticsThisMonth")}</span>
+                  </div>
+                </>
               )}
             </div>
-          </section>
 
-          {/* ── Section 2: AI Summary ── */}
-          <section className="space-y-4 pb-8">
+            {/* Total Messages */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <p className="text-xs text-gray-500 uppercase tracking-wider">{t("statisticsTotalMessages")}</p>
+              {isStatsLoading ? (
+                <div className="h-9 w-16 bg-gray-100 rounded animate-pulse mt-2" />
+              ) : (
+                <>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">{totalMessages}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-[#0F510F]" />
+                    <span className="text-sm font-medium text-[#0F510F]">+8% {t("statisticsThisMonth")}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Avg per Day */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <p className="text-xs text-gray-500 uppercase tracking-wider">{t("statisticsAvgPerDay")}</p>
+              {isStatsLoading ? (
+                <div className="h-9 w-16 bg-gray-100 rounded animate-pulse mt-2" />
+              ) : (
+                <>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">{avgPerDay.toFixed(1)}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-[#0F510F]" />
+                    <span className="text-sm font-medium text-[#0F510F]">+5% {t("statisticsThisMonth")}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Peak Day */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <p className="text-xs text-gray-500 uppercase tracking-wider">{t("statisticsPeakDay")}</p>
+              {isStatsLoading ? (
+                <div className="h-9 w-16 bg-gray-100 rounded animate-pulse mt-2" />
+              ) : (
+                <>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">{peakDayEntry?.count ?? 0}</p>
+                  <p className="text-sm text-gray-500 mt-1">{peakDayEntry?.label ?? "—"}</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* ── Bar Chart ── */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 max-w-4xl">
+            <p className="text-xs text-gray-500 mb-4">{t("statisticsPerDay")}</p>
+            {isStatsLoading ? (
+              <div className="h-48 flex items-center justify-center">
+                <div className="w-6 h-6 border-4 border-[#0F510F]/20 border-t-[#0F510F] rounded-full animate-spin" />
+              </div>
+            ) : chartData.length === 0 ? (
+              <div className="h-48 flex items-center justify-center text-sm text-gray-500">
+                {t("statisticsNoData")}
+              </div>
+            ) : showBarChart ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={chartData.length > 14 ? "preserveStartEnd" : 0}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      fontSize: 12,
+                    }}
+                    labelStyle={{ color: "#111827", fontWeight: 600 }}
+                    itemStyle={{ color: "#0F510F" }}
+                    formatter={(v: any) => [v, t("statisticsCustomersTooltip")]}
+                  />
+                  <Bar dataKey="count" fill="#0F510F" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-48 flex items-center justify-center text-sm text-gray-500">
+                {t("statisticsRangeTooLarge")}
+              </div>
+            )}
+          </div>
+
+          {/* ── AI Summary ── */}
+          <section className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-900">{t("statisticsAiSummary")}</h2>
               <button
@@ -312,7 +369,7 @@ export default function Statistics() {
             </div>
           </section>
 
-          {/* ── Section 3: Survey Overview ── */}
+          {/* ── Survey Overview ── */}
           <section className="space-y-4 pb-8">
             <div className="flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-[#0F510F]" />

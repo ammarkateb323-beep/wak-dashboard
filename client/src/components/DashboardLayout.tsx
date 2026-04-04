@@ -23,7 +23,7 @@ interface NavItem {
  *
  * Props:
  *  - children: page content
- *  - noPadding: skip the default p-6 on the content area (for full-bleed pages like inbox/chat)
+ *  - noPadding: skip the default p-8 on the content area (for full-bleed pages like inbox/chat)
  */
 export default function DashboardLayout({
   children,
@@ -78,19 +78,23 @@ export default function DashboardLayout({
   };
 
   const navItems: NavItem[] = [
-    { href: "/dashboard",     icon: <Inbox className="w-4 h-4" />,        label: t("inbox") },
-    { href: "/inbox",         icon: <TrendingUp className="w-4 h-4" />,   label: t("inboxTitle") ?? "Escalations" },
-    { href: "/agents",        icon: <Users className="w-4 h-4" />,        label: t("agents"),    adminOnly: true },
-    { href: "/contacts",      icon: <BookUser className="w-4 h-4" />,     label: t("contacts"),  adminOnly: true },
-    { href: "/customers",     icon: <ContactRound className="w-4 h-4" />, label: t("customers"), adminOnly: true },
-    { href: "/statistics",    icon: <BarChart3 className="w-4 h-4" />,    label: t("statistics") },
-    { href: "/meetings",      icon: <Video className="w-4 h-4" />,        label: t("meetings") },
-    { href: "/chatbot-config",icon: <Bot className="w-4 h-4" />,          label: t("chatbotConfig") },
-    { href: "/surveys",       icon: <ClipboardList className="w-4 h-4" />,label: t("surveys") },
-    { href: "/guide",         icon: <BookOpen className="w-4 h-4" />,     label: t("guide") },
+    { href: "/dashboard",     icon: <Inbox className="w-[18px] h-[18px]" />,        label: t("inbox") },
+    { href: "/inbox",         icon: <TrendingUp className="w-[18px] h-[18px]" />,   label: t("inboxTitle") ?? "Escalations" },
+    { href: "/agents",        icon: <Users className="w-[18px] h-[18px]" />,        label: t("agents"),    adminOnly: true },
+    { href: "/contacts",      icon: <BookUser className="w-[18px] h-[18px]" />,     label: t("contacts"),  adminOnly: true },
+    { href: "/customers",     icon: <ContactRound className="w-[18px] h-[18px]" />, label: t("customers"), adminOnly: true },
+    { href: "/statistics",    icon: <BarChart3 className="w-[18px] h-[18px]" />,    label: t("statistics") },
+    { href: "/meetings",      icon: <Video className="w-[18px] h-[18px]" />,        label: t("meetings") },
+    { href: "/chatbot-config",icon: <Bot className="w-[18px] h-[18px]" />,          label: t("chatbotConfig") },
+    { href: "/surveys",       icon: <ClipboardList className="w-[18px] h-[18px]" />,label: t("surveys") },
+    { href: "/guide",         icon: <BookOpen className="w-[18px] h-[18px]" />,     label: t("guide") },
   ];
 
   const visibleNav = navItems.filter(n => !n.adminOnly || isAdmin);
+
+  /* Split nav into main items and admin-only items for section divider */
+  const mainNav = visibleNav.filter(n => !n.adminOnly);
+  const adminNav = visibleNav.filter(n => n.adminOnly);
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return location === "/dashboard" || location === "/";
@@ -101,61 +105,85 @@ export default function DashboardLayout({
     <div dir={isRtl ? "rtl" : "ltr"} className="flex h-screen overflow-hidden bg-white font-sans text-gray-900 antialiased">
 
       {/* ─── Desktop Sidebar ─── */}
-      <aside className="hidden md:flex flex-col w-[220px] bg-[#0F510F] shrink-0">
+      <aside className="hidden md:flex flex-col w-[232px] bg-[#0F510F] shrink-0">
         {/* Logo */}
         <div className="px-4 py-5 flex items-center gap-2.5 border-b border-white/10">
-          <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm">W</div>
-          <span className="text-white/90 font-semibold text-sm">WAK Solutions</span>
+          <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-black/20">W</div>
+          <span className="text-white/90 font-semibold text-sm tracking-tight">WAK Solutions</span>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-3 px-2.5 space-y-0.5 overflow-y-auto">
-          {visibleNav.map(n => (
-            <Link key={n.href} href={n.href}>
-              <a className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
-                isActive(n.href)
-                  ? "bg-white/20 text-white"
-                  : "text-white/60 hover:text-white/90 hover:bg-white/10"
-              }`}>
-                {n.icon}
-                {n.label}
-              </a>
-            </Link>
-          ))}
+        <nav className="flex-1 py-3 px-2.5 overflow-y-auto">
+          {/* Main nav items (visible to all) */}
+          <div className="space-y-0.5">
+            {mainNav.map(n => (
+              <Link key={n.href} href={n.href}>
+                <a className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${
+                  isActive(n.href)
+                    ? "border-s-[3px] border-white bg-white/15 text-white shadow-sm"
+                    : "text-white/55 hover:text-white/85 hover:bg-white/[0.08]"
+                }`}>
+                  {n.icon}
+                  {n.label}
+                </a>
+              </Link>
+            ))}
+          </div>
+
+          {/* Section divider between main and admin items */}
+          {adminNav.length > 0 && (
+            <>
+              <div className="my-2.5 border-b border-white/[0.08]" />
+              <div className="space-y-0.5">
+                {adminNav.map(n => (
+                  <Link key={n.href} href={n.href}>
+                    <a className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${
+                      isActive(n.href)
+                        ? "border-s-[3px] border-white bg-white/15 text-white shadow-sm"
+                        : "text-white/55 hover:text-white/85 hover:bg-white/[0.08]"
+                    }`}>
+                      {n.icon}
+                      {n.label}
+                    </a>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
         </nav>
 
         {/* Bottom actions */}
-        <div className="px-2.5 pb-4 pt-2 border-t border-white/10 space-y-0.5">
+        <div className="px-3.5 pb-5 pt-3 border-t border-white/10 space-y-0.5">
           <button
             onClick={handleRegisterBiometric}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-white/60 hover:text-white/90 hover:bg-white/10 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium text-white/55 hover:text-white/85 hover:bg-white/[0.08] transition-colors"
           >
-            <Fingerprint className="w-4 h-4" /> Biometric
+            <Fingerprint className="w-[18px] h-[18px]" /> Biometric
           </button>
           <button
             onClick={toggleLang}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-white/60 hover:text-white/90 hover:bg-white/10 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium text-white/55 hover:text-white/85 hover:bg-white/[0.08] transition-colors"
           >
-            <Globe className="w-4 h-4" /> {t("switchLang")}
+            <Globe className="w-[18px] h-[18px]" /> {t("switchLang")}
           </button>
           <button
             onClick={handleLogout}
             data-testid="button-logout"
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-white/60 hover:text-red-300 hover:bg-white/10 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium text-white/55 hover:text-red-300 hover:bg-white/[0.08] transition-colors"
           >
-            <LogOut className="w-4 h-4" /> {t("logout")}
+            <LogOut className="w-[18px] h-[18px]" /> {t("logout")}
           </button>
         </div>
       </aside>
 
       {/* ─── Mobile header + menu ─── */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-50 bg-[#0F510F] h-14 flex items-center justify-between px-4 shadow-sm">
+      <div className="md:hidden fixed top-0 inset-x-0 z-50 bg-[#0F510F] h-[56px] flex items-center justify-between px-4 shadow-sm">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center text-white font-bold text-xs">W</div>
+          <div className="w-8 h-8 bg-white/15 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-sm shadow-black/20">W</div>
           <span className="text-white/90 font-semibold text-sm">WAK Solutions</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={toggleLang} className="text-white/60 hover:text-white p-1.5 rounded transition-colors">
+          <button onClick={toggleLang} className="text-white/55 hover:text-white p-1.5 rounded transition-colors">
             <Globe className="w-4 h-4" />
           </button>
           <button onClick={() => setMobileOpen(true)} className="text-white/80 hover:text-white p-1.5 rounded transition-colors">
@@ -168,8 +196,8 @@ export default function DashboardLayout({
       {mobileOpen && (
         <div className="fixed inset-0 z-[60] md:hidden" onClick={() => setMobileOpen(false)}>
           <div className="absolute inset-0 bg-black/40" />
-          <div className={`absolute top-0 ${isRtl ? "left-0" : "right-0"} h-full w-72 bg-white shadow-xl flex flex-col`} onClick={e => e.stopPropagation()}>
-            <div className="h-14 bg-[#0F510F] flex items-center justify-between px-5">
+          <div className={`absolute top-0 ${isRtl ? "left-0" : "right-0"} h-full w-80 bg-white shadow-xl flex flex-col`} onClick={e => e.stopPropagation()}>
+            <div className="h-[56px] bg-[#0F510F] flex items-center justify-between px-5">
               <span className="text-white font-semibold text-sm">{t("menu")}</span>
               <button onClick={() => setMobileOpen(false)} className="text-white/70 hover:text-white p-1 rounded transition-colors">
                 <X className="w-5 h-5" />
@@ -244,7 +272,7 @@ export default function DashboardLayout({
         )}
 
         {/* Page content */}
-        <main className={`flex-1 overflow-y-auto md:overflow-hidden pt-14 md:pt-0 ${noPadding ? "" : "p-6"}`}>
+        <main className={`flex-1 overflow-y-auto md:overflow-hidden pt-14 md:pt-0 ${noPadding ? "" : "p-8"}`}>
           {children}
         </main>
       </div>
