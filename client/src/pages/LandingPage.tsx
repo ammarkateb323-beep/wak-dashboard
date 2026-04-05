@@ -231,110 +231,182 @@ function Reveal({ children, className = "", delay = 0 }: { children: React.React
 }
 
 /* ─── WhatsApp mockup ─────────────────────────────────────────── */
-function WhatsAppMockup({ t, isRtl }: { t: (typeof copy)[Lang]; isRtl: boolean }) {
+// Reusable tick SVG for sent messages
+const BlueTicks = () => (
+  <svg className="w-3.5 h-3.5 text-[#53BDEB] shrink-0" viewBox="0 0 16 11" fill="currentColor">
+    <path d="M11.07.66L4.88 6.85 2.39 4.36a.75.75 0 00-1.06 1.06l3.03 3.03a.75.75 0 001.06 0l6.72-6.72A.75.75 0 0011.07.66z"/>
+    <path d="M14.07.66L7.88 6.85 7.12 6.09a.75.75 0 00-1.06 1.06l1.3 1.3a.75.75 0 001.06 0l6.72-6.72A.75.75 0 0014.07.66z"/>
+  </svg>
+);
+
+function WhatsAppMockup({ t }: { t: (typeof copy)[Lang]; isRtl: boolean }) {
   // device-iphone-14-pro renders at 428×868px natively.
   // Scale to ~300px wide for the landing page hero.
   const SCALE = 0.70;
   const NATIVE_W = 428;
   const NATIVE_H = 868;
   return (
-    <div
-      style={{
-        width: `${Math.round(NATIVE_W * SCALE)}px`,
-        height: `${Math.round(NATIVE_H * SCALE)}px`,
-        position: "relative",
-        overflow: "hidden",
-        margin: "0 auto",
-      }}
-    >
+    <>
+      {/* Fix 1: Override frame to Natural Titanium warm dark gray */}
+      <style>{`
+        .wak-mockup .device-frame {
+          background: linear-gradient(160deg, #5e5e5e 0%, #3d3d3d 50%, #4a4a4a 100%) !important;
+          border-color: #606060 !important;
+          box-shadow: inset 0 0 4px 2px #8c8c8c, inset 0 0 0 6px #4a4a4a !important;
+        }
+        .wak-mockup .device-stripe::before,
+        .wak-mockup .device-stripe::after {
+          background: rgba(140,140,140,0.45) !important;
+        }
+        .wak-mockup .device-btns::before,
+        .wak-mockup .device-btns::after {
+          background: #4a4a4a !important;
+          border-color: #606060 !important;
+        }
+        .wak-mockup .device-power {
+          background: #4a4a4a !important;
+          border-color: #606060 !important;
+        }
+        .wak-mockup .device-header {
+          background: #3d3d3d !important;
+        }
+      `}</style>
       <div
         style={{
-          transform: `scale(${SCALE})`,
-          transformOrigin: "top left",
-          width: `${NATIVE_W}px`,
-          position: "absolute",
-          top: 0,
-          left: 0,
+          width: `${Math.round(NATIVE_W * SCALE)}px`,
+          height: `${Math.round(NATIVE_H * SCALE)}px`,
+          position: "relative",
+          overflow: "hidden",
+          margin: "0 auto",
         }}
       >
-        <div className="device device-iphone-14-pro">
-          <div className="device-frame">
-            <div className="device-screen">
-              {/* border-radius matches .device-screen (49px) so content is clipped to the curved bezel */}
-              <div className="h-full flex flex-col bg-[#ECE5DD]" style={{ borderRadius: "49px", overflow: "hidden" }}>
-                {/* Header — pt-11 clears the Dynamic Island overlay */}
-                <div className="bg-[#075E54] text-white px-4 pt-11 pb-3 flex items-center gap-3 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#128C7E] flex items-center justify-center text-sm font-bold">W</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold truncate">{t.chatName}</div>
-                    <div className="text-[10px] text-white/70">{t.chatOnline}</div>
+        <div
+          style={{
+            transform: `scale(${SCALE})`,
+            transformOrigin: "top left",
+            width: `${NATIVE_W}px`,
+            position: "absolute",
+            top: 0,
+            left: 0,
+          }}
+        >
+          <div className="device device-iphone-14-pro wak-mockup">
+            <div className="device-frame">
+              <div className="device-screen">
+                {/* border-radius matches .device-screen (49px) so corners clip to bezel */}
+                <div className="h-full flex flex-col bg-[#ECE5DD]" dir="rtl" style={{ borderRadius: "49px", overflow: "hidden" }}>
+                  {/* Header — pt-11 clears the Dynamic Island overlay */}
+                  <div className="bg-[#075E54] text-white px-4 pt-11 pb-3 flex items-center gap-3 shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-[#128C7E] flex items-center justify-center text-sm font-bold shrink-0">W</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold truncate">WAK Solutions</div>
+                      <div className="text-[10px] text-white/70">متصل</div>
+                    </div>
                   </div>
-                </div>
-                {/* Messages */}
-                <div className={`flex-1 overflow-y-auto px-3 py-3 space-y-2 ${isRtl ? "text-right" : "text-left"}`}>
-                  {/* Customer message */}
-                  <div className={`flex ${isRtl ? "justify-start" : "justify-end"}`}>
-                    <div className="bg-[#DCF8C6] rounded-lg rounded-tr-none px-3 py-1.5 max-w-[85%] shadow-sm">
-                      <p className="text-[13px] text-gray-800 leading-relaxed">{t.chatMsg1}</p>
-                      <div className="flex items-center justify-end gap-1 mt-0.5">
-                        <span className="text-[10px] text-gray-500">10:30</span>
-                        <svg className="w-3.5 h-3.5 text-[#53BDEB]" viewBox="0 0 16 11" fill="currentColor"><path d="M11.07.66L4.88 6.85 2.39 4.36a.75.75 0 00-1.06 1.06l3.03 3.03a.75.75 0 001.06 0l6.72-6.72A.75.75 0 0011.07.66z"/><path d="M14.07.66L7.88 6.85 7.12 6.09a.75.75 0 00-1.06 1.06l1.3 1.3a.75.75 0 001.06 0l6.72-6.72A.75.75 0 0014.07.66z"/></svg>
+
+                  {/* Fix 2: Arabic conversation — always RTL regardless of page language */}
+                  <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+                    {/* Customer: السلام عليكم */}
+                    <div className="flex justify-start">
+                      <div className="bg-[#DCF8C6] rounded-lg rounded-tl-none px-3 py-1.5 max-w-[85%] shadow-sm">
+                        <p className="text-[13px] text-gray-800 leading-relaxed">السلام عليكم</p>
+                        <div className="flex items-center justify-end gap-1 mt-0.5">
+                          <span className="text-[10px] text-gray-500">10:28</span>
+                          <BlueTicks />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Bot */}
+                    <div className="flex justify-end">
+                      <div className="bg-white rounded-lg rounded-tr-none px-3 py-1.5 max-w-[85%] shadow-sm">
+                        <p className="text-[13px] text-gray-800 leading-relaxed">وعليكم السلام! 👋 أهلاً بك في WAK Solutions. كيف أقدر أساعدك اليوم؟</p>
+                        <span className="block text-[10px] text-gray-500 text-start mt-0.5">10:28</span>
+                      </div>
+                    </div>
+                    {/* Customer: ابي احجز موعد */}
+                    <div className="flex justify-start">
+                      <div className="bg-[#DCF8C6] rounded-lg rounded-tl-none px-3 py-1.5 max-w-[85%] shadow-sm">
+                        <p className="text-[13px] text-gray-800 leading-relaxed">ابي احجز موعد</p>
+                        <div className="flex items-center justify-end gap-1 mt-0.5">
+                          <span className="text-[10px] text-gray-500">10:29</span>
+                          <BlueTicks />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Bot */}
+                    <div className="flex justify-end">
+                      <div className="bg-white rounded-lg rounded-tr-none px-3 py-1.5 max-w-[85%] shadow-sm">
+                        <p className="text-[13px] text-gray-800 leading-relaxed">بكل سرور! 😊 عندنا مواعيد متاحة الأسبوع الجاي. أي يوم يناسبك؟</p>
+                        <span className="block text-[10px] text-gray-500 text-start mt-0.5">10:29</span>
+                      </div>
+                    </div>
+                    {/* Customer: الاحد الصبح */}
+                    <div className="flex justify-start">
+                      <div className="bg-[#DCF8C6] rounded-lg rounded-tl-none px-3 py-1.5 max-w-[85%] shadow-sm">
+                        <p className="text-[13px] text-gray-800 leading-relaxed">الاحد الصبح لو ممكن</p>
+                        <div className="flex items-center justify-end gap-1 mt-0.5">
+                          <span className="text-[10px] text-gray-500">10:30</span>
+                          <BlueTicks />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Bot */}
+                    <div className="flex justify-end">
+                      <div className="bg-white rounded-lg rounded-tr-none px-3 py-1.5 max-w-[85%] shadow-sm">
+                        <p className="text-[13px] text-gray-800 leading-relaxed">تمام ✅ عندي الساعة 10 الصبح أو 11، أيهم أحسن لك؟</p>
+                        <span className="block text-[10px] text-gray-500 text-start mt-0.5">10:30</span>
+                      </div>
+                    </div>
+                    {/* Customer: 10 زين */}
+                    <div className="flex justify-start">
+                      <div className="bg-[#DCF8C6] rounded-lg rounded-tl-none px-3 py-1.5 max-w-[85%] shadow-sm">
+                        <p className="text-[13px] text-gray-800 leading-relaxed">10 زين</p>
+                        <div className="flex items-center justify-end gap-1 mt-0.5">
+                          <span className="text-[10px] text-gray-500">10:31</span>
+                          <BlueTicks />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Bot: confirmation */}
+                    <div className="flex justify-end">
+                      <div className="bg-white rounded-lg rounded-tr-none px-3 py-1.5 max-w-[85%] shadow-sm">
+                        <p className="text-[13px] text-gray-800 leading-relaxed">تم الحجز! 🎉 موعدك الأحد الساعة 10 صباحاً. راح يوصلك رابط التأكيد على واتساب</p>
+                        <span className="block text-[10px] text-gray-500 text-start mt-0.5">10:31</span>
+                      </div>
+                    </div>
+                    {/* Typing indicator */}
+                    <div className="flex justify-end">
+                      <div className="bg-white rounded-lg rounded-tr-none px-4 py-2.5 shadow-sm flex gap-1 items-center">
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                       </div>
                     </div>
                   </div>
-                  {/* Bot reply */}
-                  <div className={`flex ${isRtl ? "justify-end" : "justify-start"}`}>
-                    <div className="bg-white rounded-lg rounded-tl-none px-3 py-1.5 max-w-[85%] shadow-sm">
-                      <p className="text-[13px] text-gray-800 leading-relaxed">{t.chatMsg2}</p>
-                      <span className="block text-[10px] text-gray-500 text-end mt-0.5">10:30</span>
-                    </div>
-                  </div>
-                  {/* Customer */}
-                  <div className={`flex ${isRtl ? "justify-start" : "justify-end"}`}>
-                    <div className="bg-[#DCF8C6] rounded-lg rounded-tr-none px-3 py-1.5 max-w-[85%] shadow-sm">
-                      <p className="text-[13px] text-gray-800 leading-relaxed">{t.chatMsg3}</p>
-                      <div className="flex items-center justify-end gap-1 mt-0.5">
-                        <span className="text-[10px] text-gray-500">10:31</span>
-                        <svg className="w-3.5 h-3.5 text-[#53BDEB]" viewBox="0 0 16 11" fill="currentColor"><path d="M11.07.66L4.88 6.85 2.39 4.36a.75.75 0 00-1.06 1.06l3.03 3.03a.75.75 0 001.06 0l6.72-6.72A.75.75 0 0011.07.66z"/><path d="M14.07.66L7.88 6.85 7.12 6.09a.75.75 0 00-1.06 1.06l1.3 1.3a.75.75 0 001.06 0l6.72-6.72A.75.75 0 0014.07.66z"/></svg>
+
+                  {/* Fix 3: WhatsApp-accurate input bar — 56px tall, 8px side margins, 42px mic, home indicator gap */}
+                  <div className="bg-[#F0F2F5] shrink-0" style={{ paddingBottom: "20px" }}>
+                    <div className="flex items-center gap-2 px-2" style={{ height: "56px" }}>
+                      <div className="flex-1 bg-white rounded-full px-4 flex items-center" style={{ height: "38px" }}>
+                        <span className="text-xs text-gray-400">اكتب رسالة</span>
+                      </div>
+                      <div className="bg-[#008069] rounded-full flex items-center justify-center shrink-0" style={{ width: "42px", height: "42px" }}>
+                        <Mic className="w-4 h-4 text-white" />
                       </div>
                     </div>
-                  </div>
-                  {/* Bot reply */}
-                  <div className={`flex ${isRtl ? "justify-end" : "justify-start"}`}>
-                    <div className="bg-white rounded-lg rounded-tl-none px-3 py-1.5 max-w-[85%] shadow-sm">
-                      <p className="text-[13px] text-gray-800 leading-relaxed">{t.chatMsg4}</p>
-                      <span className="block text-[10px] text-gray-500 text-end mt-0.5">10:31</span>
-                    </div>
-                  </div>
-                  {/* Typing indicator */}
-                  <div className={`flex ${isRtl ? "justify-end" : "justify-start"}`}>
-                    <div className="bg-white rounded-lg rounded-tl-none px-4 py-2.5 shadow-sm flex gap-1 items-center">
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </div>
-                  </div>
-                </div>
-                {/* Input bar */}
-                <div className="bg-[#F0F0F0] px-2 py-2 flex items-center gap-2 shrink-0">
-                  <div className="flex-1 bg-white rounded-full px-4 py-2">
-                    <span className="text-xs text-gray-400">{t.chatPlaceholder}</span>
-                  </div>
-                  <div className="w-9 h-9 bg-[#128C7E] rounded-full flex items-center justify-center">
-                    <Mic className="w-4 h-4 text-white" />
                   </div>
                 </div>
               </div>
             </div>
+            <div className="device-stripe"></div>
+            <div className="device-header"></div>
+            <div className="device-sensors"></div>
+            <div className="device-btns"></div>
+            <div className="device-power"></div>
           </div>
-          <div className="device-stripe"></div>
-          <div className="device-header"></div>
-          <div className="device-sensors"></div>
-          <div className="device-btns"></div>
-          <div className="device-power"></div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
