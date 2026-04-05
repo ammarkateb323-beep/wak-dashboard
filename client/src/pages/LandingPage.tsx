@@ -260,8 +260,8 @@ function WhatsAppMockup({ t, isRtl }: { t: (typeof copy)[Lang]; isRtl: boolean }
         <div className="device device-iphone-14-pro">
           <div className="device-frame">
             <div className="device-screen">
-              {/* WhatsApp content fills the screen */}
-              <div className="h-full flex flex-col bg-[#ECE5DD]">
+              {/* border-radius matches .device-screen (49px) so content is clipped to the curved bezel */}
+              <div className="h-full flex flex-col bg-[#ECE5DD]" style={{ borderRadius: "49px", overflow: "hidden" }}>
                 {/* Header — pt-11 clears the Dynamic Island overlay */}
                 <div className="bg-[#075E54] text-white px-4 pt-11 pb-3 flex items-center gap-3 shrink-0">
                   <div className="w-9 h-9 rounded-full bg-[#128C7E] flex items-center justify-center text-sm font-bold">W</div>
