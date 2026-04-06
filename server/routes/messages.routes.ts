@@ -80,6 +80,7 @@ export function registerMessageRoutes(app: Express): void {
           body: JSON.stringify({
             customer_phone: data.customer_phone,
             message: data.message,
+            company_id: req.session.companyId,
           }),
         });
         if (!response.ok) {
