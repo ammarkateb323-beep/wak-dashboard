@@ -232,12 +232,19 @@ function Reveal({ children, className = "", delay = 0 }: { children: React.React
 /* ─── WhatsApp mockup ─────────────────────────────────────────── */
 function WhatsAppMockup(_props: { t: (typeof copy)[Lang]; isRtl: boolean }) {
   return (
-    <div className="mx-auto" style={{ width: "min(320px, 85vw)" }}>
+    <div
+      className="mx-auto flex items-center justify-center rounded-3xl"
+      style={{
+        width: "min(360px, 90vw)",
+        padding: "32px 24px 40px",
+        background: "radial-gradient(ellipse at 50% 40%, #f5f5f0 0%, #ebebeb 60%, transparent 100%)",
+      }}
+    >
       <img
         src="/iphone-mockup.png"
         alt="WAK Solutions WhatsApp conversation on iPhone"
-        className="w-full h-auto drop-shadow-2xl"
-        style={{ filter: "drop-shadow(0 32px 48px rgba(0,0,0,0.22))" }}
+        className="w-full h-auto"
+        style={{ filter: "drop-shadow(0 24px 40px rgba(0,0,0,0.18))" }}
       />
     </div>
   );
@@ -443,11 +450,6 @@ export default function LandingPage() {
 
       {/* ─── HERO ─────────────────────────────────────────────── */}
       <section className="relative pt-28 lg:pt-36 pb-16 lg:pb-24 overflow-hidden">
-        {/* Background decoration */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-20 -start-32 w-96 h-96 bg-[#0F510F]/5 rounded-full blur-3xl" />
-          <div className="absolute -bottom-20 -end-32 w-96 h-96 bg-[#408440]/5 rounded-full blur-3xl" />
-        </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
