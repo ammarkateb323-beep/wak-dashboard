@@ -112,7 +112,8 @@ export function registerMessageRoutes(app: Express): void {
       );
 
       // Look up whether this chat is assigned to a specific agent.
-      const companyId = req.body.company_id || 1;
+      const companyId = parseInt(req.body.company_id);
+      if (!companyId) return res.status(400).json({ message: 'company_id is required' });
       const escRow = await pool.query(
         `SELECT assigned_agent_id FROM escalations
          WHERE customer_phone=$1 AND status IN ('open','in_progress') AND company_id = $2

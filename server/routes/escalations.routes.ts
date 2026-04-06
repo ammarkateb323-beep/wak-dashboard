@@ -39,7 +39,8 @@ export function registerEscalationRoutes(app: Express): void {
   app.post(api.escalations.escalate.path, requireWebhookSecret, async (req: any, res: any) => {
     try {
       const data = api.escalations.escalate.input.parse(req.body);
-      const companyId = req.body.company_id || 1;
+      const companyId = parseInt(req.body.company_id);
+      if (!companyId) return res.status(400).json({ message: 'company_id is required' });
       const result = await pool.query(
         `INSERT INTO escalations (customer_phone, escalation_reason, status, company_id)
          VALUES ($1, $2, $3, $4) RETURNING *`,

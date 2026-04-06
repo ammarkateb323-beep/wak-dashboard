@@ -32,7 +32,8 @@ export function registerMeetingRoutes(app: Express): void {
       if (!customer_phone) {
         return res.status(400).json({ message: 'customer_phone is required' });
       }
-      const companyId = req.body.company_id || 1;
+      const companyId = parseInt(req.body.company_id);
+      if (!companyId) return res.status(400).json({ message: 'company_id is required' });
       const token = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await pool.query(
