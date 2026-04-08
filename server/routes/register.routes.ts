@@ -186,26 +186,49 @@ export function registerRegistrationRoutes(app: Express): void {
 
   // ── Step 3b: Verify WhatsApp credentials ────────────────────────────────
   app.post('/api/register/whatsapp/verify', requireAuth, async (req: any, res: any) => {
-    const { phoneNumberId, accessToken } = req.body;
+    const { phoneNumberId, wabaId, accessToken } = req.body;
 
-    if (!phoneNumberId || !accessToken) {
+    if (!phoneNumberId || !accessToken || !wabaId) {
       return res.status(400).json({ verified: false, error: 'Missing credentials' });
     }
 
     try {
-      const url = `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name&access_token=${accessToken}`;
-      const resp = await fetch(url);
-      const data = await resp.json();
+      // Step 1: Validate phoneNumberId + accessToken directly
+      const phoneUrl = `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name&access_token=${accessToken}`;
+      const phoneResp = await fetch(phoneUrl);
+      const phoneData = await phoneResp.json();
 
-      if (data.error) {
-        logger.warn('WhatsApp verification failed', `error: ${data.error.message}`);
-        return res.json({ verified: false, error: data.error.message });
+      if (phoneData.error) {
+        logger.warn('WhatsApp phone number ID verification failed', `error: ${phoneData.error.message}`);
+        return res.json({ verified: false, error: phoneData.error.message });
       }
 
-      res.json({
-        verified: true,
-        displayName: data.verified_name || data.display_phone_number || 'Verified',
-      });
+      const displayName = phoneData.verified_name || phoneData.display_phone_number || 'Verified';
+
+      // Step 2: Validate wabaId by fetching its phone numbers and confirming phoneNumberId belongs to it
+      const wabaUrl = `https://graph.facebook.com/v19.0/${wabaId}/phone_numbers?fields=id&access_token=${accessToken}`;
+      const wabaResp = await fetch(wabaUrl);
+      const wabaData = await wabaResp.json();
+
+      if (wabaData.error) {
+        logger.warn('WhatsApp WABA ID verification failed', `wabaId: ${wabaId}, error: ${wabaData.error.message}`);
+        return res.json({
+          verified: false,
+          wabaError: `Invalid WABA ID: ${wabaData.error.message}`,
+        });
+      }
+
+      const ownedIds: string[] = (wabaData.data || []).map((p: any) => String(p.id));
+      if (!ownedIds.includes(String(phoneNumberId))) {
+        logger.warn('Phone number ID not found under WABA', `phoneNumberId: ${phoneNumberId}, wabaId: ${wabaId}`);
+        return res.json({
+          verified: false,
+          wabaError: `Phone Number ID ${phoneNumberId} does not belong to WABA ${wabaId}. Check both values in your Meta Business dashboard.`,
+        });
+      }
+
+      logger.info('WhatsApp credentials verified', `phoneNumberId: ${phoneNumberId}, wabaId: ${wabaId}`);
+      res.json({ verified: true, displayName });
     } catch (err: any) {
       logger.error('WhatsApp verification error', `error: ${err.message}`);
       res.json({ verified: false, error: 'Could not reach Meta API' });

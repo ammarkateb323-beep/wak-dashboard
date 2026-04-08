@@ -417,10 +417,12 @@ function Step2({ form, setForm, t }: { form: FormData; setForm: (f: FormData) =>
 function Step3({ form, setForm, t }: { form: FormData; setForm: (f: FormData) => void; t: (k: string) => string }) {
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState("");
+  const [wabaError, setWabaError] = useState("");
 
   const handleVerify = async () => {
     setVerifying(true);
     setVerifyError("");
+    setWabaError("");
     try {
       const resp = await fetch("/api/register/whatsapp/verify", {
         method: "POST",
@@ -428,14 +430,19 @@ function Step3({ form, setForm, t }: { form: FormData; setForm: (f: FormData) =>
         credentials: "include",
         body: JSON.stringify({
           phoneNumberId: form.phoneNumberId,
+          wabaId: form.wabaId,
           accessToken: form.accessToken,
         }),
       });
       const data = await resp.json();
       if (data.verified) {
         setForm({ ...form, whatsappVerified: true, whatsappDisplayName: data.displayName });
+      } else if (data.wabaError) {
+        setWabaError(data.wabaError);
+        setForm({ ...form, whatsappVerified: false });
       } else {
         setVerifyError(data.error || t("regVerifyFailed"));
+        setForm({ ...form, whatsappVerified: false });
       }
     } catch {
       setVerifyError(t("regVerifyFailed"));
@@ -444,7 +451,7 @@ function Step3({ form, setForm, t }: { form: FormData; setForm: (f: FormData) =>
     }
   };
 
-  const credentialsEmpty = !form.phoneNumberId && !form.accessToken;
+  const credentialsEmpty = !form.phoneNumberId && !form.wabaId && !form.accessToken;
 
   return (
     <div className="space-y-5">
@@ -475,11 +482,17 @@ function Step3({ form, setForm, t }: { form: FormData; setForm: (f: FormData) =>
 
       <FormField label={t("regWabaId")}>
         <input
-          className={inputClass}
+          className={wabaError ? `${inputClass} border-red-300 focus:ring-red-200 focus:border-red-400` : inputClass}
           value={form.wabaId}
-          onChange={(e) => setForm({ ...form, wabaId: e.target.value })}
+          onChange={(e) => {
+            setWabaError("");
+            setForm({ ...form, wabaId: e.target.value, whatsappVerified: false });
+          }}
           placeholder="e.g. 123456789012345"
         />
+        {wabaError && (
+          <p className="text-xs text-red-500 mt-1">{wabaError}</p>
+        )}
       </FormField>
 
       <FormField label={t("regAccessToken")}>
@@ -496,7 +509,7 @@ function Step3({ form, setForm, t }: { form: FormData; setForm: (f: FormData) =>
         <button
           type="button"
           onClick={handleVerify}
-          disabled={!form.phoneNumberId || !form.accessToken || verifying}
+          disabled={!form.phoneNumberId || !form.wabaId || !form.accessToken || verifying}
           className="inline-flex items-center gap-2 bg-[#0F510F] text-white px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 hover:bg-[#0d4510] transition-colors"
         >
           {verifying ? (
